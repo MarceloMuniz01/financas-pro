@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Contact;
 use App\Services\Contacts\ContactMergeService;
-use App\Services\Contacts\ContactSimilarityService;
+use App\Services\Contacts\ContactNameNormalizer;
+use App\Services\Contacts\ContactSimilaritySignature;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,7 @@ class ContactController extends Controller
 
             'contact_type' => [
                 'nullable',
+
                 Rule::in([
                     'company',
                     'individual',
@@ -42,6 +44,20 @@ class ContactController extends Controller
 
         $contacts = Contact::query()
             ->where('user_id', $userId)
+            ->select([
+                'id',
+                'user_id',
+                'name',
+                'normalized_name',
+                'document',
+                'contact_type',
+                'default_expense_category_id',
+                'default_income_category_id',
+                'looks_like_contact_id',
+                'similarity_dismissed_at',
+                'created_at',
+                'updated_at',
+            ])
             ->with([
                 'defaultExpenseCategory:id,name,type,color',
 
@@ -49,51 +65,58 @@ class ContactController extends Controller
 
                 'aliases:id,user_id,contact_id,name,normalized_name',
 
-                'looksLikeContact' => function ($query) {
-                    $query->select([
-                        'id',
-                        'user_id',
-                        'name',
-                        'document',
-                        'contact_type',
-                        'default_expense_category_id',
-                        'default_income_category_id',
-                    ])->with([
-                                'defaultExpenseCategory:id,name,type,color',
+                'looksLikeContact' => function ($query): void {
+                    $query
+                        ->select([
+                            'id',
+                            'user_id',
+                            'name',
+                            'document',
+                            'contact_type',
+                            'default_expense_category_id',
+                            'default_income_category_id',
+                        ])
+                        ->with([
+                            'defaultExpenseCategory:id,name,type,color',
 
-                                'defaultIncomeCategory:id,name,type,color',
+                            'defaultIncomeCategory:id,name,type,color',
 
-                                'aliases:id,user_id,contact_id,name,normalized_name',
-                            ])->withCount('transactions');
+                            'aliases:id,user_id,contact_id,name,normalized_name',
+                        ])
+                        ->withCount('transactions');
                 },
             ])
             ->withCount('transactions')
             ->when(
                 $filters['search'] ?? null,
-                function ($query, string $search) {
-                    $query->where(function ($query) use ($search) {
-                        $query
-                            ->where(
-                                'name',
-                                'ilike',
-                                "%{$search}%"
-                            )
-                            ->orWhere(
-                                'document',
-                                'ilike',
-                                "%{$search}%"
-                            )
-                            ->orWhereHas(
-                                'aliases',
-                                function ($query) use ($search) {
-                                    $query->where(
-                                        'name',
-                                        'ilike',
-                                        "%{$search}%"
-                                    );
-                                }
-                            );
-                    });
+                function ($query, string $search): void {
+                    $search = trim($search);
+
+                    $query->where(
+                        function ($query) use ($search): void {
+                            $query
+                                ->where(
+                                    'name',
+                                    'ilike',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'document',
+                                    'ilike',
+                                    "%{$search}%"
+                                )
+                                ->orWhereHas(
+                                    'aliases',
+                                    function ($query) use ($search): void {
+                                        $query->where(
+                                            'name',
+                                            'ilike',
+                                            "%{$search}%"
+                                        );
+                                    }
+                                );
+                        }
+                    );
                 }
             )
             ->when(
@@ -131,14 +154,16 @@ class ContactController extends Controller
             ->withQueryString();
 
         $categories = Category::query()
-            ->where(function ($query) use ($userId) {
-                $query
-                    ->whereNull('user_id')
-                    ->orWhere(
-                        'user_id',
-                        $userId
-                    );
-            })
+            ->where(
+                function ($query) use ($userId): void {
+                    $query
+                        ->whereNull('user_id')
+                        ->orWhere(
+                            'user_id',
+                            $userId
+                        );
+                }
+            )
             ->orderBy('type')
             ->orderBy('name')
             ->get([
@@ -203,17 +228,27 @@ class ContactController extends Controller
                 'string',
                 'max:255',
 
-                Rule::unique(
-                    'contacts',
-                    'name'
-                )
-                    ->where(
-                        fn($query) => $query->where(
-                            'user_id',
-                            $userId
+                function (string $attribute, mixed $value, Closure $fail) use ($userId, $contact): void {
+                    $normalizedName =
+                        ContactNameNormalizer::normalize(
+                            (string) $value
+                        );
+
+                    $exists = Contact::query()
+                        ->where('user_id', $userId)
+                        ->where(
+                            'normalized_name',
+                            $normalizedName
                         )
-                    )
-                    ->ignore($contact->id),
+                        ->whereKeyNot($contact->id)
+                        ->exists();
+
+                    if ($exists) {
+                        $fail(
+                            'Já existe um contato com esse nome.'
+                        );
+                    }
+                },
             ],
 
             'contact_type' => [
@@ -307,8 +342,40 @@ class ContactController extends Controller
                 'default_income_category_id'
             );
 
+        $normalizedName =
+            ContactNameNormalizer::normalize(
+                $validated['name']
+            );
+
+        $similarityKeys =
+            ContactSimilaritySignature::make(
+                $validated['name']
+            );
+
         $contact->update([
-            'name' => $validated['name'],
+            'name' =>
+                $validated['name'],
+
+            'normalized_name' =>
+                $normalizedName,
+
+            'similarity_key' =>
+                mb_substr(
+                    $normalizedName,
+                    0,
+                    12,
+                    'UTF-8'
+                ),
+
+            'similarity_signature' =>
+                $similarityKeys[
+                    'similarity_signature'
+                ],
+
+            'similarity_prefix' =>
+                $similarityKeys[
+                    'similarity_prefix'
+                ],
 
             'document' =>
                 $validated['document']
@@ -325,19 +392,18 @@ class ContactController extends Controller
                 $incomeCategoryId,
 
             /*
-             * Uma edição altera o nível de completude.
-             * Permitimos que o detector avalie novamente.
+             * A edição invalida uma sugestão antiga.
+             *
+             * Não executamos uma nova detecção aqui.
+             * A análise automática permanece centralizada
+             * no ProcessImportJob.
              */
-            'similarity_dismissed_at' => null,
-            'looks_like_contact_id' => null,
-        ]);
+            'similarity_dismissed_at' =>
+                null,
 
-        /*
-         * A edição pode tornar este contato mais completo que
-         * outro ou eliminar uma sugestão antiga.
-         */
-        (new ContactSimilarityService())
-            ->detectForUser($userId);
+            'looks_like_contact_id' =>
+                null,
+        ]);
 
         return back()->with(
             'success',
@@ -360,13 +426,16 @@ class ContactController extends Controller
         );
 
         $contact->update([
-            'looks_like_contact_id' => null,
+            'looks_like_contact_id' =>
+                null,
 
             /*
-             * Impede que a sugestão seja recriada na próxima
-             * importação, até que o contato seja editado.
+             * Impede que a sugestão seja recriada
+             * automaticamente em uma próxima importação,
+             * até que o contato seja editado.
              */
-            'similarity_dismissed_at' => now(),
+            'similarity_dismissed_at' =>
+                now(),
         ]);
 
         return back()->with(
@@ -427,39 +496,49 @@ class ContactController extends Controller
             ],
         ]);
 
+        $sourceContactId =
+            (int) $validated[
+                'source_contact_id'
+            ];
+
+        $targetContactId =
+            (int) $validated[
+                'target_contact_id'
+            ];
+
         /*
          * A rota precisa partir de um dos dois contatos
          * envolvidos na mesclagem.
          */
         if (
-            $contact->id
-            !== (int) $validated['source_contact_id']
-            && $contact->id
-            !== (int) $validated['target_contact_id']
+            $contact->id !== $sourceContactId
+            && $contact->id !== $targetContactId
         ) {
             abort(403);
         }
 
-        $target = $mergeService->merge(
+        $mergeService->merge(
             userId: $userId,
 
             sourceContactId:
-            (int) $validated[
-                'source_contact_id'
-            ],
+            $sourceContactId,
 
             targetContactId:
-            (int) $validated[
-                'target_contact_id'
-            ]
+            $targetContactId
         );
 
         /*
-         * A mesclagem pode alterar quais contatos são
-         * considerados semelhantes.
+         * Não executamos detecção de similaridade aqui.
+         *
+         * O ContactMergeService já:
+         *
+         * - move as transações;
+         * - transfere os aliases;
+         * - limpa referências à origem;
+         * - remove o contato de origem.
+         *
+         * Uma análise adicional seria retrabalho.
          */
-        (new ContactSimilarityService())
-            ->detectForUser($userId);
 
         return back()->with(
             'success',
@@ -482,7 +561,8 @@ class ContactController extends Controller
     /**
      * Normaliza CPF ou CNPJ enviado pelo usuário.
      *
-     * Na edição manual, documentos censurados não são aceitos.
+     * Na edição manual, documentos censurados
+     * não são aceitos.
      */
     private function normalizeDocument(
         mixed $document
@@ -500,8 +580,8 @@ class ContactController extends Controller
         }
 
         /*
-         * Evita transformar um documento censurado em
-         * uma sequência parcial de números.
+         * Evita transformar um documento censurado
+         * em uma sequência parcial de números.
          */
         if (
             preg_match(
@@ -614,14 +694,16 @@ class ContactController extends Controller
                 'type',
                 $categoryType
             )
-            ->where(function ($query) use ($userId) {
-                $query
-                    ->whereNull('user_id')
-                    ->orWhere(
-                        'user_id',
-                        $userId
-                    );
-            })
+            ->where(
+                function ($query) use ($userId): void {
+                    $query
+                        ->whereNull('user_id')
+                        ->orWhere(
+                            'user_id',
+                            $userId
+                        );
+                }
+            )
             ->first();
 
         if (!$category) {
@@ -666,8 +748,7 @@ class ContactController extends Controller
             ) {
                 $sum +=
                     (int) $cpf[$index]
-                    *
-                    (($position + 1) - $index);
+                    * (($position + 1) - $index);
             }
 
             $digit = (10 * $sum) % 11;
