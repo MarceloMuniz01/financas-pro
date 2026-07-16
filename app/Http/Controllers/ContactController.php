@@ -6,7 +6,6 @@ use App\Models\Category;
 use App\Models\Contact;
 use App\Services\Contacts\ContactMergeService;
 use App\Services\Contacts\ContactNameNormalizer;
-use App\Services\Contacts\ContactSimilaritySignature;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,9 +19,10 @@ class ContactController extends Controller
     /**
      * Lista os contatos do usuário autenticado.
      */
-    public function index(Request $request): Response
-    {
-        $userId = $request->user()->id;
+    public function index(
+        Request $request
+    ): Response {
+        $userId = (int) $request->user()->id;
 
         $filters = $request->validate([
             'search' => [
@@ -43,7 +43,10 @@ class ContactController extends Controller
         ]);
 
         $contacts = Contact::query()
-            ->where('user_id', $userId)
+            ->where(
+                'user_id',
+                $userId
+            )
             ->select([
                 'id',
                 'user_id',
@@ -53,8 +56,6 @@ class ContactController extends Controller
                 'contact_type',
                 'default_expense_category_id',
                 'default_income_category_id',
-                'looks_like_contact_id',
-                'similarity_dismissed_at',
                 'created_at',
                 'updated_at',
             ])
@@ -64,33 +65,18 @@ class ContactController extends Controller
                 'defaultIncomeCategory:id,name,type,color',
 
                 'aliases:id,user_id,contact_id,name,normalized_name',
-
-                'looksLikeContact' => function ($query): void {
-                    $query
-                        ->select([
-                            'id',
-                            'user_id',
-                            'name',
-                            'document',
-                            'contact_type',
-                            'default_expense_category_id',
-                            'default_income_category_id',
-                        ])
-                        ->with([
-                            'defaultExpenseCategory:id,name,type,color',
-
-                            'defaultIncomeCategory:id,name,type,color',
-
-                            'aliases:id,user_id,contact_id,name,normalized_name',
-                        ])
-                        ->withCount('transactions');
-                },
             ])
-            ->withCount('transactions')
+            ->withCount(
+                'transactions'
+            )
             ->when(
                 $filters['search'] ?? null,
                 function ($query, string $search): void {
                     $search = trim($search);
+
+                    if ($search === '') {
+                        return;
+                    }
 
                     $query->where(
                         function ($query) use ($search): void {
@@ -142,13 +128,6 @@ class ContactController extends Controller
                     'contact_type'
                 )
             )
-            /*
-             * Mostra primeiro os contatos que possuem
-             * sugestão de possível duplicidade.
-             */
-            ->orderByRaw(
-                'looks_like_contact_id IS NULL'
-            )
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();
@@ -194,31 +173,37 @@ class ContactController extends Controller
     }
 
     /**
-     * Atualiza os dados editáveis do contato.
+     * Atualiza os dados editáveis de um contato.
      */
     public function update(
         Request $request,
         Contact $contact
     ): RedirectResponse {
-        $userId = $request->user()->id;
+        $userId = (int) $request->user()->id;
 
         $this->ensureContactBelongsToUser(
-            $contact,
-            $userId
+            contact: $contact,
+            userId: $userId
         );
 
         $request->merge([
             'name' => trim(
-                (string) $request->input('name')
+                (string) $request->input(
+                    'name'
+                )
             ),
 
             'contact_type' =>
-                $request->input('contact_type')
+                $request->input(
+                    'contact_type'
+                )
                 ?: null,
 
             'document' =>
                 $this->normalizeDocument(
-                    $request->input('document')
+                    $request->input(
+                        'document'
+                    )
                 ),
         ]);
 
@@ -234,18 +219,59 @@ class ContactController extends Controller
                             (string) $value
                         );
 
-                    $exists = Contact::query()
-                        ->where('user_id', $userId)
+                    if ($normalizedName === '') {
+                        $fail(
+                            'Informe um nome válido.'
+                        );
+
+                        return;
+                    }
+
+                    $officialNameExists =
+                        Contact::query()
+                            ->where(
+                                'user_id',
+                                $userId
+                            )
+                            ->where(
+                                'normalized_name',
+                                $normalizedName
+                            )
+                            ->whereKeyNot(
+                                $contact->id
+                            )
+                            ->exists();
+
+                    if ($officialNameExists) {
+                        $fail(
+                            'Já existe um contato com esse nome.'
+                        );
+
+                        return;
+                    }
+
+                    $aliasExists = $contact
+                        ->aliases()
+                        ->getModel()
+                        ->newQuery()
+                        ->where(
+                            'user_id',
+                            $userId
+                        )
                         ->where(
                             'normalized_name',
                             $normalizedName
                         )
-                        ->whereKeyNot($contact->id)
+                        ->where(
+                            'contact_id',
+                            '<>',
+                            $contact->id
+                        )
                         ->exists();
 
-                    if ($exists) {
+                    if ($aliasExists) {
                         $fail(
-                            'Já existe um contato com esse nome.'
+                            'Esse nome já está cadastrado como apelido de outro contato.'
                         );
                     }
                 },
@@ -283,12 +309,15 @@ class ContactController extends Controller
                     'document'
                 )
                     ->where(
-                        fn($query) => $query->where(
-                            'user_id',
-                            $userId
-                        )
+                        fn($query) => $query
+                            ->where(
+                                'user_id',
+                                $userId
+                            )
                     )
-                    ->ignore($contact->id),
+                    ->ignore(
+                        $contact->id
+                    ),
             ],
 
             'default_expense_category_id' => [
@@ -319,9 +348,11 @@ class ContactController extends Controller
                     'default_expense_category_id'
                 ] ?? null,
 
-                categoryType: 'expense',
+                categoryType:
+                'expense',
 
-                userId: $userId,
+                userId:
+                $userId,
 
                 field:
                 'default_expense_category_id'
@@ -334,9 +365,11 @@ class ContactController extends Controller
                     'default_income_category_id'
                 ] ?? null,
 
-                categoryType: 'income',
+                categoryType:
+                'income',
 
-                userId: $userId,
+                userId:
+                $userId,
 
                 field:
                 'default_income_category_id'
@@ -347,10 +380,8 @@ class ContactController extends Controller
                 $validated['name']
             );
 
-        $similarityKeys =
-            ContactSimilaritySignature::make(
-                $validated['name']
-            );
+        $oldNormalizedName =
+            (string) $contact->normalized_name;
 
         $contact->update([
             'name' =>
@@ -358,24 +389,6 @@ class ContactController extends Controller
 
             'normalized_name' =>
                 $normalizedName,
-
-            'similarity_key' =>
-                mb_substr(
-                    $normalizedName,
-                    0,
-                    12,
-                    'UTF-8'
-                ),
-
-            'similarity_signature' =>
-                $similarityKeys[
-                    'similarity_signature'
-                ],
-
-            'similarity_prefix' =>
-                $similarityKeys[
-                    'similarity_prefix'
-                ],
 
             'document' =>
                 $validated['document']
@@ -390,20 +403,61 @@ class ContactController extends Controller
 
             'default_income_category_id' =>
                 $incomeCategoryId,
-
-            /*
-             * A edição invalida uma sugestão antiga.
-             *
-             * Não executamos uma nova detecção aqui.
-             * A análise automática permanece centralizada
-             * no ProcessImportJob.
-             */
-            'similarity_dismissed_at' =>
-                null,
-
-            'looks_like_contact_id' =>
-                null,
         ]);
+
+        /*
+         * O nome oficial atual não deve também existir
+         * como apelido desse contato.
+         */
+        $contact
+            ->aliases()
+            ->where(
+                'normalized_name',
+                $normalizedName
+            )
+            ->delete();
+
+        /*
+         * Quando o nome oficial é alterado manualmente,
+         * o nome antigo pode continuar reconhecido como alias.
+         */
+        if (
+            $oldNormalizedName !== ''
+            && $oldNormalizedName !== $normalizedName
+        ) {
+            $oldName = trim(
+                (string) $contact->getOriginal(
+                    'name'
+                )
+            );
+
+            if ($oldName !== '') {
+                $contact->aliases()
+                    ->getModel()
+                    ->newQuery()
+                    ->insertOrIgnore([
+                        [
+                            'user_id' =>
+                                $userId,
+
+                            'contact_id' =>
+                                $contact->id,
+
+                            'name' =>
+                                $oldName,
+
+                            'normalized_name' =>
+                                $oldNormalizedName,
+
+                            'created_at' =>
+                                now(),
+
+                            'updated_at' =>
+                                now(),
+                        ],
+                    ]);
+            }
+        }
 
         return back()->with(
             'success',
@@ -412,138 +466,101 @@ class ContactController extends Controller
     }
 
     /**
-     * Descarta uma sugestão de possível duplicidade.
+     * Mescla vários contatos selecionados em um único contato.
      */
-    public function dismissSimilarity(
+    public function mergeMany(
         Request $request,
-        Contact $contact
-    ): RedirectResponse {
-        $userId = $request->user()->id;
-
-        $this->ensureContactBelongsToUser(
-            $contact,
-            $userId
-        );
-
-        $contact->update([
-            'looks_like_contact_id' =>
-                null,
-
-            /*
-             * Impede que a sugestão seja recriada
-             * automaticamente em uma próxima importação,
-             * até que o contato seja editado.
-             */
-            'similarity_dismissed_at' =>
-                now(),
-        ]);
-
-        return back()->with(
-            'success',
-            'Sugestão de contato semelhante ignorada.'
-        );
-    }
-
-    /**
-     * Mescla um contato de origem em um contato de destino.
-     *
-     * O contato de origem será excluído.
-     * O contato de destino permanecerá.
-     */
-    public function merge(
-        Request $request,
-        Contact $contact,
         ContactMergeService $mergeService
     ): RedirectResponse {
-        $userId = $request->user()->id;
-
-        $this->ensureContactBelongsToUser(
-            $contact,
-            $userId
-        );
+        $userId = (int) $request->user()->id;
 
         $validated = $request->validate([
-            'source_contact_id' => [
+            'contact_ids' => [
+                'required',
+                'array',
+                'min:2',
+                'max:100',
+            ],
+
+            'contact_ids.*' => [
                 'required',
                 'integer',
-                'different:target_contact_id',
+                'distinct',
 
                 Rule::exists(
                     'contacts',
                     'id'
                 )->where(
-                        fn($query) => $query->where(
-                            'user_id',
-                            $userId
-                        )
+                        fn($query) => $query
+                            ->where(
+                                'user_id',
+                                $userId
+                            )
                     ),
             ],
 
             'target_contact_id' => [
                 'required',
                 'integer',
-                'different:source_contact_id',
 
                 Rule::exists(
                     'contacts',
                     'id'
                 )->where(
-                        fn($query) => $query->where(
-                            'user_id',
-                            $userId
-                        )
+                        fn($query) => $query
+                            ->where(
+                                'user_id',
+                                $userId
+                            )
                     ),
             ],
         ]);
 
-        $sourceContactId =
-            (int) $validated[
-                'source_contact_id'
-            ];
+        $contactIds = array_values(
+            array_unique(
+                array_map(
+                    'intval',
+                    $validated[
+                        'contact_ids'
+                    ]
+                )
+            )
+        );
 
         $targetContactId =
             (int) $validated[
                 'target_contact_id'
             ];
 
-        /*
-         * A rota precisa partir de um dos dois contatos
-         * envolvidos na mesclagem.
-         */
         if (
-            $contact->id !== $sourceContactId
-            && $contact->id !== $targetContactId
+            !in_array(
+                $targetContactId,
+                $contactIds,
+                true
+            )
         ) {
-            abort(403);
+            throw ValidationException::withMessages([
+                'target_contact_id' =>
+                    'O contato mantido deve estar entre os contatos selecionados.',
+            ]);
         }
 
-        $mergeService->merge(
+        $mergeService->mergeMany(
             userId: $userId,
-
-            sourceContactId:
-            $sourceContactId,
-
-            targetContactId:
-            $targetContactId
+            contactIds: $contactIds,
+            targetContactId: $targetContactId
         );
 
-        /*
-         * Não executamos detecção de similaridade aqui.
-         *
-         * O ContactMergeService já:
-         *
-         * - move as transações;
-         * - transfere os aliases;
-         * - limpa referências à origem;
-         * - remove o contato de origem.
-         *
-         * Uma análise adicional seria retrabalho.
-         */
-
-        return back()->with(
-            'success',
-            'Contatos mesclados com sucesso.'
-        );
+        return redirect()
+            ->route('contacts.index')
+            ->with(
+                'success',
+                count($contactIds)
+                === 2
+                ? 'Contatos mesclados com sucesso.'
+                : count($contactIds)
+                . ' contatos foram mesclados com sucesso.'
+            );
     }
 
     /**
@@ -553,16 +570,16 @@ class ContactController extends Controller
         Contact $contact,
         int $userId
     ): void {
-        if ($contact->user_id !== $userId) {
+        if (
+            (int) $contact->user_id
+            !== $userId
+        ) {
             abort(403);
         }
     }
 
     /**
-     * Normaliza CPF ou CNPJ enviado pelo usuário.
-     *
-     * Na edição manual, documentos censurados
-     * não são aceitos.
+     * Normaliza o CPF ou CNPJ informado manualmente.
      */
     private function normalizeDocument(
         mixed $document
@@ -580,8 +597,8 @@ class ContactController extends Controller
         }
 
         /*
-         * Evita transformar um documento censurado
-         * em uma sequência parcial de números.
+         * Documentos censurados vindos de extratos não devem
+         * ser convertidos em números parciais durante edição.
          */
         if (
             preg_match(
@@ -645,7 +662,11 @@ class ContactController extends Controller
                 return;
             }
 
-            if (!$this->isValidCpf($document)) {
+            if (
+                !$this->isValidCpf(
+                    $document
+                )
+            ) {
                 $fail(
                     'O CPF informado é inválido.'
                 );
@@ -663,7 +684,11 @@ class ContactController extends Controller
                 return;
             }
 
-            if (!$this->isValidCnpj($document)) {
+            if (
+                !$this->isValidCnpj(
+                    $document
+                )
+            ) {
                 $fail(
                     'O CNPJ informado é inválido.'
                 );
@@ -673,7 +698,7 @@ class ContactController extends Controller
 
     /**
      * Valida se a categoria é global ou pertence ao usuário
-     * e se possui o tipo correto.
+     * e se possui o tipo esperado.
      */
     private function validateCategory(
         mixed $categoryId,
@@ -697,7 +722,9 @@ class ContactController extends Controller
             ->where(
                 function ($query) use ($userId): void {
                     $query
-                        ->whereNull('user_id')
+                        ->whereNull(
+                            'user_id'
+                        )
                         ->orWhere(
                             'user_id',
                             $userId
@@ -715,11 +742,11 @@ class ContactController extends Controller
             ]);
         }
 
-        return $category->id;
+        return (int) $category->id;
     }
 
     /**
-     * Valida CPF pelos dois dígitos verificadores.
+     * Valida os dígitos verificadores do CPF.
      */
     private function isValidCpf(
         string $cpf
@@ -748,10 +775,15 @@ class ContactController extends Controller
             ) {
                 $sum +=
                     (int) $cpf[$index]
-                    * (($position + 1) - $index);
+                    * (
+                        ($position + 1)
+                        - $index
+                    );
             }
 
-            $digit = (10 * $sum) % 11;
+            $digit =
+                (10 * $sum)
+                % 11;
 
             if ($digit === 10) {
                 $digit = 0;
@@ -769,7 +801,7 @@ class ContactController extends Controller
     }
 
     /**
-     * Valida CNPJ pelos dois dígitos verificadores.
+     * Valida os dígitos verificadores do CNPJ.
      */
     private function isValidCnpj(
         string $cnpj
@@ -848,6 +880,8 @@ class ContactController extends Controller
 
     /**
      * Calcula um dígito verificador do CNPJ.
+     *
+     * @param array<int> $weights
      */
     private function calculateCnpjDigit(
         string $base,
@@ -863,7 +897,8 @@ class ContactController extends Controller
                 * $weight;
         }
 
-        $remainder = $sum % 11;
+        $remainder =
+            $sum % 11;
 
         return $remainder < 2
             ? 0

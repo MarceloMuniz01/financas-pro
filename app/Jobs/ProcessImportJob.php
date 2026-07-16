@@ -3,14 +3,11 @@
 namespace App\Jobs;
 
 use App\Models\Import;
+use App\Services\BankParsers\BankDetector;
 use App\Services\BankParsers\BankParserFactory;
 use App\Services\Categorizers\StringMatchCategorizer;
 use App\Services\Contacts\ContactNameNormalizer;
-use App\Services\Contacts\ContactSimilaritySignature;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,24 +15,29 @@ use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
-class ProcessImportJob implements ShouldQueue
+class ProcessImportJob
 {
     use Dispatchable;
-    use InteractsWithQueue;
-    use Queueable;
     use SerializesModels;
 
-    private const CONTACT_BATCH_SIZE = 3000;
+    /**
+     * Contatos inseridos por consulta.
+     *
+     * Não aumente exageradamente porque cada coluna de cada
+     * registro utiliza um parâmetro no PostgreSQL.
+     */
+    private const CONTACT_BATCH_SIZE = 1000;
 
-    private const TRANSACTION_BATCH_SIZE = 5000;
+    /**
+     * Transações inseridas por consulta.
+     */
+    private const TRANSACTION_BATCH_SIZE = 2000;
 
-    private const PENDING_TRANSACTION_LIMIT = 6000;
-
-    private const SIMILARITY_JOB_BATCH_SIZE = 6000;
-
-    public int $timeout = 900;
-
-    public int $tries = 3;
+    /**
+     * Quantidade máxima de transações aguardando os IDs
+     * dos contatos ainda não persistidos.
+     */
+    private const PENDING_TRANSACTION_LIMIT = 5000;
 
     public function __construct(
         public Import $import
@@ -44,7 +46,16 @@ class ProcessImportJob implements ShouldQueue
 
     public function handle(): void
     {
-        $jobStartedAt = microtime(true);
+        /*
+         * A importação está sendo executada dentro da própria
+         * requisição HTTP no MVP.
+         *
+         * Isso aumenta somente o limite do PHP. A infraestrutura
+         * do Laravel Cloud ainda pode possuir timeout próprio.
+         */
+        set_time_limit(300);
+
+        $startedAt = microtime(true);
         $stream = null;
 
         $this->import->update([
@@ -54,6 +65,12 @@ class ProcessImportJob implements ShouldQueue
         ]);
 
         try {
+            /*
+            |--------------------------------------------------------------------------
+            | Abrir arquivo
+            |--------------------------------------------------------------------------
+            */
+
             $stream = Storage::readStream(
                 $this->import->filename
             );
@@ -64,31 +81,93 @@ class ProcessImportJob implements ShouldQueue
                 );
             }
 
-            $parser = BankParserFactory::make(
-                $this->import->bank
+            /*
+|--------------------------------------------------------------------------
+| Identificar o banco
+|--------------------------------------------------------------------------
+*/
+
+            $detectionStartedAt = microtime(true);
+
+            $fileContent = stream_get_contents($stream);
+
+            if ($fileContent === false) {
+                throw new RuntimeException(
+                    'Não foi possível ler o conteúdo do arquivo.'
+                );
+            }
+
+            $bankDetector = app(
+                BankDetector::class
             );
 
-            $categorizer = new StringMatchCategorizer(
-                $this->import->user_id
+            $bank = app(BankDetector::class)
+                ->detect($stream);
+
+            $this->import->update([
+                'bank' => $bank,
+            ]);
+
+            /*
+             * O conteúdo foi lido até o fim.
+             * O parser precisa começar novamente do início.
+             */
+            if (fseek($stream, 0) !== 0) {
+                throw new RuntimeException(
+                    'Não foi possível retornar ao início do arquivo após identificar o banco.'
+                );
+            }
+
+            $this->import->update([
+                'bank' => $bank,
+            ]);
+
+            $this->logStep(
+                step: 'detect_bank',
+                startedAt: $detectionStartedAt,
+                extra: [
+                    'bank' => $bank,
+                ]
             );
 
             /*
             |--------------------------------------------------------------------------
-            | Caches
+            | Criar parser e categorizador
+            |--------------------------------------------------------------------------
+            */
+
+            $parser = BankParserFactory::make(
+                $bank
+            );
+
+            $categorizer =
+                new StringMatchCategorizer(
+                    $this->import->user_id
+                );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Carregar caches
             |--------------------------------------------------------------------------
             */
 
             $cacheStartedAt = microtime(true);
 
-            $contactCache = $this->loadContactCache();
-            $aliasCache = $this->loadAliasCache();
+            $contactCache =
+                $this->loadContactCache();
+
+            $aliasCache =
+                $this->loadAliasCache();
 
             $this->logStep(
                 step: 'load_caches',
                 startedAt: $cacheStartedAt,
                 extra: [
-                    'contacts_loaded' => count($contactCache),
-                    'aliases_loaded' => count($aliasCache),
+                    'contacts_loaded' =>
+                        count($contactCache),
+
+                    'aliases_loaded' =>
+                        count($aliasCache),
                 ]
             );
 
@@ -99,70 +178,79 @@ class ProcessImportJob implements ShouldQueue
             */
 
             $pendingContacts = [];
-
             $pendingTransactions = [];
-
             $transactionBatch = [];
 
-            /*
-             * Somente IDs efetivamente criados nesta importação.
-             */
-            $newContactIds = [];
-
             $processedTransactions = 0;
-
             $newContactCandidates = 0;
 
             $now = now();
 
             /*
             |--------------------------------------------------------------------------
-            | Processamento em stream
+            | Processar arquivo em stream
             |--------------------------------------------------------------------------
             */
 
             $parseStartedAt = microtime(true);
 
-            foreach ($parser->parse($stream) as $transaction) {
+            foreach (
+                $parser->parse($stream)
+                as $transaction
+            ) {
                 $processedTransactions++;
 
-                $visibleName = $this->normalizeVisibleName(
-                    $transaction['counterparty_name'] ?? null
-                );
+                $visibleName =
+                    $this->normalizeVisibleName(
+                        $transaction[
+                            'counterparty_name'
+                        ] ?? null
+                    );
 
-                $normalizedName = ContactNameNormalizer::normalize(
-                    $visibleName
-                );
-
-                if ($normalizedName === '') {
-                    $visibleName = 'Desconhecido';
-
-                    $normalizedName = ContactNameNormalizer::normalize(
+                $normalizedName =
+                    ContactNameNormalizer::normalize(
                         $visibleName
                     );
+
+                if ($normalizedName === '') {
+                    $visibleName =
+                        'Desconhecido';
+
+                    $normalizedName =
+                        ContactNameNormalizer::normalize(
+                            $visibleName
+                        );
                 }
 
                 /*
-                 * Busca primeiro pelo nome oficial.
+                 * Procura primeiro pelo nome oficial.
                  */
-                $contact = $contactCache[$normalizedName] ?? null;
+                $contact =
+                    $contactCache[
+                        $normalizedName
+                    ] ?? null;
 
                 /*
-                 * Depois busca pelos aliases.
+                 * Depois procura pelos apelidos criados
+                 * durante mesclagens manuais.
                  */
                 if ($contact === null) {
-                    $contact = $aliasCache[$normalizedName] ?? null;
+                    $contact =
+                        $aliasCache[
+                            $normalizedName
+                        ] ?? null;
                 }
 
                 /*
-                 * Contato já existente.
+                 * O contato já existe ou o nome é um alias.
                  */
                 if ($contact !== null) {
                     $this->queueTransaction(
                         transaction: $transaction,
                         contact: $contact,
                         categorizer: $categorizer,
-                        transactionBatch: $transactionBatch,
+                        transactionBatch:
+                        $transactionBatch,
                         now: $now
                     );
 
@@ -179,18 +267,23 @@ class ProcessImportJob implements ShouldQueue
                 }
 
                 /*
-                 * Novo contato pendente.
+                 * O contato ainda não existe.
                  */
-                $wasNewPendingContact = !isset(
-                    $pendingContacts[$normalizedName]
+                $wasNewPendingContact =
+                    !isset(
+                    $pendingContacts[
+                        $normalizedName
+                    ]
                 );
 
                 $this->queueContact(
                     visibleName: $visibleName,
-                    normalizedName: $normalizedName,
+                    normalizedName:
+                    $normalizedName,
                     transaction: $transaction,
                     categorizer: $categorizer,
-                    pendingContacts: $pendingContacts,
+                    pendingContacts:
+                    $pendingContacts,
                     now: $now
                 );
 
@@ -199,12 +292,18 @@ class ProcessImportJob implements ShouldQueue
                 }
 
                 /*
-                 * Aguarda o ID do contato.
+                 * A transação aguarda o contato ser salvo
+                 * e receber um ID.
                  */
                 $pendingTransactions[] = [
-                    'transaction' => $transaction,
-                    'normalized_name' => $normalizedName,
-                    'visible_name' => $visibleName,
+                    'transaction' =>
+                        $transaction,
+
+                    'normalized_name' =>
+                        $normalizedName,
+
+                    'visible_name' =>
+                        $visibleName,
                 ];
 
                 if (
@@ -214,16 +313,29 @@ class ProcessImportJob implements ShouldQueue
                     count($pendingTransactions)
                     >= self::PENDING_TRANSACTION_LIMIT
                 ) {
-                    $this->flushContactsAndPendingTransactions(
-                        pendingContacts: $pendingContacts,
-                        pendingTransactions: $pendingTransactions,
-                        transactionBatch: $transactionBatch,
-                        contactCache: $contactCache,
-                        aliasCache: $aliasCache,
-                        newContactIds: $newContactIds,
-                        categorizer: $categorizer,
-                        now: $now
-                    );
+                    $this
+                        ->flushContactsAndPendingTransactions(
+                            pendingContacts:
+                            $pendingContacts,
+
+                            pendingTransactions:
+                            $pendingTransactions,
+
+                            transactionBatch:
+                            $transactionBatch,
+
+                            contactCache:
+                            $contactCache,
+
+                            aliasCache:
+                            $aliasCache,
+
+                            categorizer:
+                            $categorizer,
+
+                            now:
+                            $now
+                        );
                 }
             }
 
@@ -245,18 +357,32 @@ class ProcessImportJob implements ShouldQueue
             |--------------------------------------------------------------------------
             */
 
-            $finalFlushStartedAt = microtime(true);
+            $finalFlushStartedAt =
+                microtime(true);
 
-            $this->flushContactsAndPendingTransactions(
-                pendingContacts: $pendingContacts,
-                pendingTransactions: $pendingTransactions,
-                transactionBatch: $transactionBatch,
-                contactCache: $contactCache,
-                aliasCache: $aliasCache,
-                newContactIds: $newContactIds,
-                categorizer: $categorizer,
-                now: $now
-            );
+            $this
+                ->flushContactsAndPendingTransactions(
+                    pendingContacts:
+                    $pendingContacts,
+
+                    pendingTransactions:
+                    $pendingTransactions,
+
+                    transactionBatch:
+                    $transactionBatch,
+
+                    contactCache:
+                    $contactCache,
+
+                    aliasCache:
+                    $aliasCache,
+
+                    categorizer:
+                    $categorizer,
+
+                    now:
+                    $now
+                );
 
             $this->flushTransactions(
                 $transactionBatch
@@ -264,7 +390,8 @@ class ProcessImportJob implements ShouldQueue
 
             $this->logStep(
                 step: 'final_flush',
-                startedAt: $finalFlushStartedAt
+                startedAt:
+                $finalFlushStartedAt
             );
 
             if ($processedTransactions === 0) {
@@ -290,34 +417,6 @@ class ProcessImportJob implements ShouldQueue
                 'error_message' => null,
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Detecção de similaridade
-            |--------------------------------------------------------------------------
-            */
-
-            $newContactIds = array_values(
-                array_unique(
-                    array_map(
-                        'intval',
-                        $newContactIds
-                    )
-                )
-            );
-
-            foreach (
-                array_chunk(
-                    $newContactIds,
-                    self::SIMILARITY_JOB_BATCH_SIZE
-                )
-                as $contactIds
-            ) {
-                DetectContactSimilaritiesJob::dispatch(
-                    userId: $this->import->user_id,
-                    contactIds: $contactIds
-                );
-            }
-
             Log::info(
                 "Importação {$this->import->id} concluída.",
                 [
@@ -325,25 +424,17 @@ class ProcessImportJob implements ShouldQueue
                         $this->import->user_id,
 
                     'bank' =>
-                        $this->import->bank,
+                        $bank,
 
                     'transactions_processed' =>
                         $processedTransactions,
 
-                    'contact_candidates' =>
+                    'new_contact_candidates' =>
                         $newContactCandidates,
 
-                    'new_contacts_created' =>
-                        count($newContactIds),
-
-                    'similarity_jobs_dispatched' =>
-                        (int) ceil(
-                            count($newContactIds)
-                            / self::SIMILARITY_JOB_BATCH_SIZE
-                        ),
-
                     'total_seconds' => round(
-                        microtime(true) - $jobStartedAt,
+                        microtime(true)
+                        - $startedAt,
                         3
                     ),
 
@@ -357,13 +448,16 @@ class ProcessImportJob implements ShouldQueue
             );
         } catch (Throwable $exception) {
             Log::error(
-                "Erro na importação {$this->import->id}: {$exception->getMessage()}",
+                "Erro na importação {$this->import->id}.",
                 [
                     'user_id' =>
                         $this->import->user_id,
 
                     'bank' =>
                         $this->import->bank,
+
+                    'message' =>
+                        $exception->getMessage(),
 
                     'exception' =>
                         $exception,
@@ -381,6 +475,10 @@ class ProcessImportJob implements ShouldQueue
                 ),
             ]);
 
+            /*
+             * O ImportController captura esta exceção e
+             * devolve um redirect Inertia com mensagem.
+             */
             throw $exception;
         } finally {
             if (is_resource($stream)) {
@@ -390,6 +488,10 @@ class ProcessImportJob implements ShouldQueue
     }
 
     /**
+     * Carrega todos os contatos do usuário em memória.
+     *
+     * A chave do array é o normalized_name.
+     *
      * @return array<string, array<string, mixed>>
      */
     private function loadContactCache(): array
@@ -414,10 +516,15 @@ class ProcessImportJob implements ShouldQueue
             ->chunkById(
                 5000,
                 function ($contacts) use (&$cache): void {
-                    foreach ($contacts as $contact) {
+                    foreach (
+                        $contacts
+                        as $contact
+                    ) {
                         $cache[
-                            $contact->normalized_name
-                        ] = $this->contactRowToArray(
+                            $contact
+                                ->normalized_name
+                        ] = $this
+                                ->contactRowToArray(
                                     $contact
                                 );
                     }
@@ -429,6 +536,12 @@ class ProcessImportJob implements ShouldQueue
     }
 
     /**
+     * Carrega aliases e resolve o contato principal.
+     *
+     * Quando um nome antigo aparecer em um novo extrato,
+     * a transação será vinculada ao contato mantido na
+     * mesclagem.
+     *
      * @return array<string, array<string, mixed>>
      */
     private function loadAliasCache(): array
@@ -451,7 +564,8 @@ class ProcessImportJob implements ShouldQueue
                 $this->import->user_id
             )
             ->select([
-                'contact_aliases.id as alias_id',
+                'contact_aliases.id
+                    as alias_id',
 
                 'contact_aliases.normalized_name
                     as alias_normalized_name',
@@ -464,14 +578,21 @@ class ProcessImportJob implements ShouldQueue
                 'contacts.default_expense_category_id',
                 'contacts.default_income_category_id',
             ])
-            ->orderBy('contact_aliases.id')
+            ->orderBy(
+                'contact_aliases.id'
+            )
             ->chunkById(
                 5000,
                 function ($aliases) use (&$cache): void {
-                    foreach ($aliases as $alias) {
+                    foreach (
+                        $aliases
+                        as $alias
+                    ) {
                         $cache[
-                            $alias->alias_normalized_name
-                        ] = $this->contactRowToArray(
+                            $alias
+                                ->alias_normalized_name
+                        ] = $this
+                                ->contactRowToArray(
                                     $alias
                                 );
                     }
@@ -483,6 +604,11 @@ class ProcessImportJob implements ShouldQueue
         return $cache;
     }
 
+    /**
+     * Prepara um contato para inserção.
+     *
+     * @param array<string, array<string, mixed>> $pendingContacts
+     */
     private function queueContact(
         string $visibleName,
         string $normalizedName,
@@ -491,10 +617,22 @@ class ProcessImportJob implements ShouldQueue
         array &$pendingContacts,
         mixed $now
     ): void {
-        if (isset($pendingContacts[$normalizedName])) {
+        /*
+         * Mais de uma transação no mesmo arquivo pode
+         * possuir exatamente o mesmo contato.
+         */
+        if (
+            isset(
+            $pendingContacts[
+                $normalizedName
+            ]
+        )
+        ) {
             $this->enrichPendingContact(
                 pendingContact:
-                $pendingContacts[$normalizedName],
+                $pendingContacts[
+                    $normalizedName
+                ],
 
                 transaction:
                 $transaction
@@ -504,8 +642,12 @@ class ProcessImportJob implements ShouldQueue
         }
 
         $contactType =
-            $transaction['counterparty_contact_type']
-            ?? $transaction['counterparty_type']
+            $transaction[
+                'counterparty_contact_type'
+            ]
+            ?? $transaction[
+                'counterparty_type'
+            ]
             ?? null;
 
         if (!$contactType) {
@@ -515,12 +657,9 @@ class ProcessImportJob implements ShouldQueue
                 );
         }
 
-        $similarityKeys =
-            ContactSimilaritySignature::make(
-                $visibleName
-            );
-
-        $pendingContacts[$normalizedName] = [
+        $pendingContacts[
+            $normalizedName
+        ] = [
             'user_id' =>
                 $this->import->user_id,
 
@@ -529,25 +668,6 @@ class ProcessImportJob implements ShouldQueue
 
             'normalized_name' =>
                 $normalizedName,
-
-            /*
-             * Mantido por compatibilidade com o banco atual.
-             * O novo detector usará signature e prefix.
-             */
-            'similarity_key' =>
-                $this->makeLegacySimilarityKey(
-                    $normalizedName
-                ),
-
-            'similarity_signature' =>
-                $similarityKeys[
-                    'similarity_signature'
-                ],
-
-            'similarity_prefix' =>
-                $similarityKeys[
-                    'similarity_prefix'
-                ],
 
             'document' =>
                 $transaction[
@@ -558,22 +678,18 @@ class ProcessImportJob implements ShouldQueue
                 $contactType,
 
             'default_expense_category_id' =>
-                $categorizer->guessCategoryId(
-                    $visibleName,
-                    'expense'
-                ),
+                $categorizer
+                    ->guessCategoryId(
+                        $visibleName,
+                        'expense'
+                    ),
 
             'default_income_category_id' =>
-                $categorizer->guessCategoryId(
-                    $visibleName,
-                    'income'
-                ),
-
-            'looks_like_contact_id' =>
-                null,
-
-            'similarity_dismissed_at' =>
-                null,
+                $categorizer
+                    ->guessCategoryId(
+                        $visibleName,
+                        'income'
+                    ),
 
             'created_at' =>
                 $now,
@@ -583,6 +699,10 @@ class ProcessImportJob implements ShouldQueue
         ];
     }
 
+    /**
+     * Enriquece um contato ainda pendente com dados
+     * encontrados em outra transação do mesmo arquivo.
+     */
     private function enrichPendingContact(
         array &$pendingContact,
         array $transaction
@@ -602,37 +722,58 @@ class ProcessImportJob implements ShouldQueue
             ?? null;
 
         if (
-            empty($pendingContact['document'])
+            empty(
+            $pendingContact[
+                'document'
+            ]
+        )
             && !empty($document)
         ) {
-            $pendingContact['document'] =
-                $document;
+            $pendingContact[
+                'document'
+            ] = $document;
         }
 
         if (
-            empty($pendingContact['contact_type'])
+            empty(
+            $pendingContact[
+                'contact_type'
+            ]
+        )
             && !empty($contactType)
         ) {
-            $pendingContact['contact_type'] =
-                $contactType;
+            $pendingContact[
+                'contact_type'
+            ] = $contactType;
         }
     }
 
+    /**
+     * Persiste os contatos e depois prepara as transações
+     * que estavam aguardando seus IDs.
+     *
+     * @param array<string, array<string, mixed>> $pendingContacts
+     * @param array<int, array<string, mixed>> $pendingTransactions
+     * @param array<int, array<string, mixed>> $transactionBatch
+     * @param array<string, array<string, mixed>> $contactCache
+     * @param array<string, array<string, mixed>> $aliasCache
+     */
     private function flushContactsAndPendingTransactions(
         array &$pendingContacts,
         array &$pendingTransactions,
         array &$transactionBatch,
         array &$contactCache,
         array $aliasCache,
-        array &$newContactIds,
         StringMatchCategorizer $categorizer,
         mixed $now
     ): void {
         if (!empty($pendingContacts)) {
             $this->flushContacts(
-                pendingContacts: $pendingContacts,
-                contactCache: $contactCache,
-                newContactIds: $newContactIds
+                pendingContacts:
+                $pendingContacts,
+
+                contactCache:
+                $contactCache
             );
         }
 
@@ -640,13 +781,22 @@ class ProcessImportJob implements ShouldQueue
             return;
         }
 
-        foreach ($pendingTransactions as $pending) {
+        foreach (
+            $pendingTransactions
+            as $pending
+        ) {
             $normalizedName =
-                $pending['normalized_name'];
+                $pending[
+                    'normalized_name'
+                ];
 
             $contact =
-                $contactCache[$normalizedName]
-                ?? $aliasCache[$normalizedName]
+                $contactCache[
+                    $normalizedName
+                ]
+                ?? $aliasCache[
+                    $normalizedName
+                ]
                 ?? null;
 
             if ($contact === null) {
@@ -657,7 +807,9 @@ class ProcessImportJob implements ShouldQueue
 
             $this->queueTransaction(
                 transaction:
-                $pending['transaction'],
+                $pending[
+                    'transaction'
+                ],
 
                 contact:
                 $contact,
@@ -685,10 +837,15 @@ class ProcessImportJob implements ShouldQueue
         $pendingTransactions = [];
     }
 
+    /**
+     * Persiste contatos em lote.
+     *
+     * @param array<string, array<string, mixed>> $pendingContacts
+     * @param array<string, array<string, mixed>> $contactCache
+     */
     private function flushContacts(
         array &$pendingContacts,
-        array &$contactCache,
-        array &$newContactIds
+        array &$contactCache
     ): void {
         if (empty($pendingContacts)) {
             return;
@@ -714,45 +871,50 @@ class ProcessImportJob implements ShouldQueue
             as $chunk
         ) {
             $insertedContacts =
-                $this->insertContactsReturning(
-                    $chunk
-                );
-
-            foreach ($insertedContacts as $contact) {
-                $normalizedName =
-                    (string) $contact->normalized_name;
-
-                $contactCache[$normalizedName] =
-                    $this->contactRowToArray(
-                        $contact
+                $this
+                    ->insertContactsReturning(
+                        $chunk
                     );
+
+            foreach (
+                $insertedContacts
+                as $contact
+            ) {
+                $normalizedName =
+                    (string) $contact
+                        ->normalized_name;
+
+                $contactCache[
+                    $normalizedName
+                ] = $this
+                        ->contactRowToArray(
+                            $contact
+                        );
 
                 $resolvedNormalizedNames[
                     $normalizedName
                 ] = true;
-
-                $newContactIds[] =
-                    (int) $contact->id;
             }
         }
 
         /*
-         * Busca somente conflitos ou registros criados
-         * concorrentemente.
+         * ON CONFLICT DO NOTHING não retorna os contatos
+         * que já existiam. Buscamos somente os faltantes.
          */
-        $missingNormalizedNames = array_values(
-            array_filter(
-                $normalizedNames,
-                static fn(
-                string $normalizedName
-            ): bool =>
-                !isset(
-                $resolvedNormalizedNames[
-                    $normalizedName
-                ]
-            )
-            )
-        );
+        $missingNormalizedNames =
+            array_values(
+                array_filter(
+                    $normalizedNames,
+                    static fn(
+                    string $normalizedName
+                ): bool =>
+                    !isset(
+                    $resolvedNormalizedNames[
+                        $normalizedName
+                    ]
+                )
+                )
+            );
 
         foreach (
             array_chunk(
@@ -765,29 +927,35 @@ class ProcessImportJob implements ShouldQueue
                 continue;
             }
 
-            $existingContacts = DB::table('contacts')
-                ->where(
-                    'user_id',
-                    $this->import->user_id
-                )
-                ->whereIn(
-                    'normalized_name',
-                    $missingChunk
-                )
-                ->get([
-                    'id',
-                    'name',
-                    'normalized_name',
-                    'document',
-                    'contact_type',
-                    'default_expense_category_id',
-                    'default_income_category_id',
-                ]);
+            $existingContacts =
+                DB::table('contacts')
+                    ->where(
+                        'user_id',
+                        $this->import->user_id
+                    )
+                    ->whereIn(
+                        'normalized_name',
+                        $missingChunk
+                    )
+                    ->get([
+                        'id',
+                        'name',
+                        'normalized_name',
+                        'document',
+                        'contact_type',
+                        'default_expense_category_id',
+                        'default_income_category_id',
+                    ]);
 
-            foreach ($existingContacts as $contact) {
+            foreach (
+                $existingContacts
+                as $contact
+            ) {
                 $contactCache[
-                    $contact->normalized_name
-                ] = $this->contactRowToArray(
+                    $contact
+                        ->normalized_name
+                ] = $this
+                        ->contactRowToArray(
                             $contact
                         );
             }
@@ -801,10 +969,14 @@ class ProcessImportJob implements ShouldQueue
                     count($normalizedNames),
 
                 'inserted_contacts' =>
-                    count($resolvedNormalizedNames),
+                    count(
+                        $resolvedNormalizedNames
+                    ),
 
                 'conflicting_contacts' =>
-                    count($missingNormalizedNames),
+                    count(
+                        $missingNormalizedNames
+                    ),
             ]
         );
 
@@ -812,6 +984,8 @@ class ProcessImportJob implements ShouldQueue
     }
 
     /**
+     * Executa um INSERT em lote com RETURNING.
+     *
      * @param array<int, array<string, mixed>> $rows
      * @return array<int, object>
      */
@@ -826,15 +1000,10 @@ class ProcessImportJob implements ShouldQueue
             'user_id',
             'name',
             'normalized_name',
-            'similarity_key',
-            'similarity_signature',
-            'similarity_prefix',
             'document',
             'contact_type',
             'default_expense_category_id',
             'default_income_category_id',
-            'looks_like_contact_id',
-            'similarity_dismissed_at',
             'created_at',
             'updated_at',
         ];
@@ -850,17 +1019,19 @@ class ProcessImportJob implements ShouldQueue
             )
         );
 
-        $rowPlaceholder = '(' . implode(
-            ', ',
-            array_fill(
-                0,
-                count($columns),
-                '?'
+        $rowPlaceholder =
+            '('
+            . implode(
+                ', ',
+                array_fill(
+                    0,
+                    count($columns),
+                    '?'
+                )
             )
-        ) . ')';
+            . ')';
 
         $valuePlaceholders = [];
-
         $bindings = [];
 
         foreach ($rows as $row) {
@@ -869,7 +1040,8 @@ class ProcessImportJob implements ShouldQueue
 
             foreach ($columns as $column) {
                 $bindings[] =
-                    $row[$column] ?? null;
+                    $row[$column]
+                    ?? null;
             }
         }
 
@@ -907,6 +1079,13 @@ class ProcessImportJob implements ShouldQueue
         );
     }
 
+    /**
+     * Prepara uma transação para inserção.
+     *
+     * @param array<string, mixed> $transaction
+     * @param array<string, mixed> $contact
+     * @param array<int, array<string, mixed>> $transactionBatch
+     */
     private function queueTransaction(
         array $transaction,
         array $contact,
@@ -928,10 +1107,11 @@ class ProcessImportJob implements ShouldQueue
 
         if (!$categoryId) {
             $categoryId =
-                $categorizer->guessCategoryId(
-                    $contact['name'],
-                    $transactionType
-                );
+                $categorizer
+                    ->guessCategoryId(
+                        $contact['name'],
+                        $transactionType
+                    );
         }
 
         $transactionBatch[] = [
@@ -951,9 +1131,10 @@ class ProcessImportJob implements ShouldQueue
                 $transaction[
                     'transaction_code'
                 ]
-                ?? $this->fallbackTransactionCode(
-                    $transaction
-                ),
+                ?? $this
+                    ->fallbackTransactionCode(
+                        $transaction
+                    ),
 
             'transaction_date' =>
                 $transaction[
@@ -966,7 +1147,9 @@ class ProcessImportJob implements ShouldQueue
                 ],
 
             'amount' =>
-                $transaction['amount'],
+                $transaction[
+                    'amount'
+                ],
 
             'source_type' =>
                 $transaction[
@@ -988,6 +1171,11 @@ class ProcessImportJob implements ShouldQueue
         ];
     }
 
+    /**
+     * Insere transações em lote.
+     *
+     * @param array<int, array<string, mixed>> $transactionBatch
+     */
     private function flushTransactions(
         array &$transactionBatch
     ): void {
@@ -997,7 +1185,9 @@ class ProcessImportJob implements ShouldQueue
 
         $startedAt = microtime(true);
 
-        $total = count($transactionBatch);
+        $total = count(
+            $transactionBatch
+        );
 
         foreach (
             array_chunk(
@@ -1007,14 +1197,17 @@ class ProcessImportJob implements ShouldQueue
             as $chunk
         ) {
             DB::table('transactions')
-                ->insertOrIgnore($chunk);
+                ->insertOrIgnore(
+                    $chunk
+                );
         }
 
         $this->logStep(
             step: 'flush_transactions',
             startedAt: $startedAt,
             extra: [
-                'batch_size' => $total,
+                'batch_size' =>
+                    $total,
             ]
         );
 
@@ -1022,6 +1215,8 @@ class ProcessImportJob implements ShouldQueue
     }
 
     /**
+     * Converte uma linha do Query Builder em array.
+     *
      * @return array<string, mixed>
      */
     private function contactRowToArray(
@@ -1035,13 +1230,16 @@ class ProcessImportJob implements ShouldQueue
                 (string) $contact->name,
 
             'normalized_name' =>
-                (string) $contact->normalized_name,
+                (string) $contact
+                    ->normalized_name,
 
             'document' =>
-                $contact->document ?? null,
+                $contact->document
+                ?? null,
 
             'contact_type' =>
-                $contact->contact_type ?? null,
+                $contact->contact_type
+                ?? null,
 
             'default_expense_category_id' =>
                 $contact
@@ -1061,17 +1259,6 @@ class ProcessImportJob implements ShouldQueue
         ];
     }
 
-    private function makeLegacySimilarityKey(
-        string $normalizedName
-    ): string {
-        return mb_substr(
-            $normalizedName,
-            0,
-            12,
-            'UTF-8'
-        );
-    }
-
     private function normalizeVisibleName(
         ?string $name
     ): string {
@@ -1084,6 +1271,10 @@ class ProcessImportJob implements ShouldQueue
             : 'Desconhecido';
     }
 
+    /**
+     * Gera um identificador quando o parser não fornece
+     * um código próprio da transação.
+     */
     private function fallbackTransactionCode(
         array $transaction
     ): string {
@@ -1111,6 +1302,9 @@ class ProcessImportJob implements ShouldQueue
         );
     }
 
+    /**
+     * Registra duração e memória de uma etapa.
+     */
     private function logStep(
         string $step,
         float $startedAt,
