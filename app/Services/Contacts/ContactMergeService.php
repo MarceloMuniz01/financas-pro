@@ -3,18 +3,26 @@
 namespace App\Services\Contacts;
 
 use App\Models\Contact;
-use App\Models\ContactAlias;
-use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ContactMergeService
 {
     /**
      * Mescla o contato de origem no contato de destino.
      *
-     * O contato de origem será removido.
-     * O contato de destino permanecerá.
+     * Origem:
+     * - perde suas transações;
+     * - tem seus aliases transferidos;
+     * - seu nome vira alias do destino;
+     * - é excluída.
+     *
+     * Destino:
+     * - permanece;
+     * - recebe dados ausentes;
+     * - recebe transações e aliases.
      */
     public function merge(
         int $userId,
@@ -28,240 +36,424 @@ class ContactMergeService
             ]);
         }
 
-        return DB::transaction(function () use ($userId, $sourceContactId, $targetContactId): Contact {
-            /*
-             * Bloqueia os dois registros durante a mesclagem.
-             *
-             * A ordenação por ID ajuda a manter sempre a mesma
-             * ordem de bloqueio e reduz risco de deadlock.
-             */
-            $contacts = Contact::query()
-                ->where('user_id', $userId)
-                ->whereIn('id', [
-                    $sourceContactId,
-                    $targetContactId,
-                ])
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('id');
+        $startedAt = microtime(true);
 
-            $source = $contacts->get(
-                $sourceContactId
-            );
-
-            $target = $contacts->get(
-                $targetContactId
-            );
-
-            if (!$source || !$target) {
-                throw ValidationException::withMessages([
-                    'contacts' =>
-                        'Um dos contatos selecionados não existe ou não pertence ao usuário.',
-                ]);
-            }
-
-            $this->ensureContactsCanBeMerged(
-                source: $source,
-                target: $target
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | 1. Herdar dados ausentes
-            |--------------------------------------------------------------------------
-            |
-            | O destino mantém seus próprios dados.
-            | Apenas campos vazios são preenchidos a partir da origem.
-            |
-            */
-
-            $target->update([
-                'document' =>
-                    $target->document
-                    ?: $source->document,
-
-                'contact_type' =>
-                    $target->contact_type
-                    ?: $source->contact_type,
-
-                'default_expense_category_id' =>
-                    $target->default_expense_category_id
-                    ?: $source->default_expense_category_id,
-
-                'default_income_category_id' =>
-                    $target->default_income_category_id
-                    ?: $source->default_income_category_id,
-
-                'looks_like_contact_id' => null,
-                'similarity_dismissed_at' => null,
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | 2. Mover todas as transações
-            |--------------------------------------------------------------------------
-            */
-
-            Transaction::query()
-                ->where('user_id', $userId)
-                ->where(
-                    'contact_id',
-                    $source->id
-                )
-                ->update([
-                    'contact_id' => $target->id,
-                    'updated_at' => now(),
-                ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | 3. Transformar o nome antigo em alias
-            |--------------------------------------------------------------------------
-            */
-
-            $this->createAliasFromName(
-                userId: $userId,
-                contactId: $target->id,
-                name: $source->name
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | 4. Mover aliases antigos da origem
-            |--------------------------------------------------------------------------
-            */
-
-            $sourceAliases = ContactAlias::query()
-                ->where('user_id', $userId)
-                ->where(
-                    'contact_id',
-                    $source->id
-                )
-                ->lockForUpdate()
-                ->get();
-
-            foreach ($sourceAliases as $alias) {
-                $existingAlias = ContactAlias::query()
-                    ->where('user_id', $userId)
-                    ->where(
-                        'normalized_name',
-                        $alias->normalized_name
-                    )
-                    ->first();
-
-                if ($existingAlias) {
+        try {
+            $resultContactId = DB::transaction(
+                function () use ($userId, $sourceContactId, $targetContactId): int {
                     /*
-                     * Caso o alias já exista no destino,
-                     * apenas remove a duplicata da origem.
+                    |--------------------------------------------------------------------------
+                    | 1. Carregar e bloquear apenas os dois contatos
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $contacts = DB::table('contacts')
+                        ->where('user_id', $userId)
+                        ->whereIn('id', [
+                            $sourceContactId,
+                            $targetContactId,
+                        ])
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->get([
+                            'id',
+                            'name',
+                            'normalized_name',
+                            'document',
+                            'contact_type',
+                            'default_expense_category_id',
+                            'default_income_category_id',
+                            'looks_like_contact_id',
+                        ])
+                        ->keyBy('id');
+
+                    $source = $contacts->get(
+                        $sourceContactId
+                    );
+
+                    $target = $contacts->get(
+                        $targetContactId
+                    );
+
+                    if (!$source || !$target) {
+                        throw ValidationException::withMessages([
+                            'contacts' =>
+                                'Um dos contatos não existe ou não pertence ao usuário.',
+                        ]);
+                    }
+
+                    $this->ensureContactsCanBeMerged(
+                        source: $source,
+                        target: $target
+                    );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | 2. Preparar os aliases
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $sourceNormalizedName =
+                        ContactNameNormalizer::normalize(
+                            $source->name
+                        );
+
+                    $targetNormalizedName =
+                        ContactNameNormalizer::normalize(
+                            $target->name
+                        );
+
+                    $aliasRows = [];
+
+                    /*
+                     * O nome antigo da origem passa a ser
+                     * um apelido do destino.
                      */
                     if (
-                        $existingAlias->contact_id
-                        === $target->id
+                        $sourceNormalizedName !== ''
+                        && $sourceNormalizedName
+                        !== $targetNormalizedName
                     ) {
-                        $alias->delete();
+                        $aliasRows[] = [
+                            'user_id' =>
+                                $userId,
 
-                        continue;
+                            'contact_id' =>
+                                $targetContactId,
+
+                            'name' =>
+                                trim($source->name),
+
+                            'normalized_name' =>
+                                $sourceNormalizedName,
+
+                            'created_at' =>
+                                now(),
+
+                            'updated_at' =>
+                                now(),
+                        ];
                     }
 
                     /*
-                     * Um mesmo alias não pode apontar para
-                     * contatos diferentes.
+                     * Carrega somente os aliases da origem.
                      */
-                    throw ValidationException::withMessages([
-                        'aliases' =>
-                            "O apelido \"{$alias->name}\" já pertence a outro contato.",
-                    ]);
-                }
+                    $sourceAliases = DB::table(
+                        'contact_aliases'
+                    )
+                        ->where('user_id', $userId)
+                        ->where(
+                            'contact_id',
+                            $sourceContactId
+                        )
+                        ->lockForUpdate()
+                        ->get([
+                            'name',
+                            'normalized_name',
+                            'created_at',
+                        ]);
 
-                $alias->update([
-                    'contact_id' => $target->id,
-                ]);
-            }
+                    foreach ($sourceAliases as $alias) {
+                        /*
+                         * O nome oficial do destino não precisa
+                         * existir também como alias.
+                         */
+                        if (
+                            $alias->normalized_name
+                            === $targetNormalizedName
+                        ) {
+                            continue;
+                        }
+
+                        $aliasRows[] = [
+                            'user_id' =>
+                                $userId,
+
+                            'contact_id' =>
+                                $targetContactId,
+
+                            'name' =>
+                                trim($alias->name),
+
+                            'normalized_name' =>
+                                $alias->normalized_name,
+
+                            'created_at' =>
+                                $alias->created_at
+                                ?? now(),
+
+                            'updated_at' =>
+                                now(),
+                        ];
+                    }
+
+                    $aliasRows = $this->uniqueAliasRows(
+                        $aliasRows
+                    );
+
+                    /*
+                     * Um alias da origem ou do destino é permitido.
+                     * Só existe conflito se pertencer a um terceiro contato.
+                     */
+                    $this->validateAliasConflicts(
+                        userId: $userId,
+                        sourceContactId: $sourceContactId,
+                        targetContactId: $targetContactId,
+                        aliasRows: $aliasRows
+                    );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | 3. Atualizar o destino uma única vez
+                    |--------------------------------------------------------------------------
+                    */
+
+                    DB::table('contacts')
+                        ->where('user_id', $userId)
+                        ->where('id', $targetContactId)
+                        ->update([
+                            'document' =>
+                                $this->firstFilled(
+                                    $target->document,
+                                    $source->document
+                                ),
+
+                            'contact_type' =>
+                                $this->firstFilled(
+                                    $target->contact_type,
+                                    $source->contact_type
+                                ),
+
+                            'default_expense_category_id' =>
+                                $target
+                                    ->default_expense_category_id
+                                ?? $source
+                                    ->default_expense_category_id,
+
+                            'default_income_category_id' =>
+                                $target
+                                    ->default_income_category_id
+                                ?? $source
+                                    ->default_income_category_id,
+
+                            /*
+                             * A sugestão já foi resolvida
+                             * pela própria mesclagem.
+                             */
+                            'looks_like_contact_id' =>
+                                null,
+
+                            'similarity_dismissed_at' =>
+                                null,
+
+                            'updated_at' =>
+                                now(),
+                        ]);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | 4. Mover todas as transações em uma query
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $movedTransactions = DB::table(
+                        'transactions'
+                    )
+                        ->where('user_id', $userId)
+                        ->where(
+                            'contact_id',
+                            $sourceContactId
+                        )
+                        ->update([
+                            'contact_id' =>
+                                $targetContactId,
+
+                            'updated_at' =>
+                                now(),
+                        ]);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | 5. Mover os aliases
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (!empty($aliasRows)) {
+                        DB::table('contact_aliases')
+                            ->insertOrIgnore(
+                                $aliasRows
+                            );
+                    }
+
+                    /*
+                     * Os aliases já foram copiados para o destino.
+                     */
+                    DB::table('contact_aliases')
+                        ->where('user_id', $userId)
+                        ->where(
+                            'contact_id',
+                            $sourceContactId
+                        )
+                        ->delete();
+
+                    /*
+                     * Remove um eventual alias que seja igual
+                     * ao nome oficial do destino.
+                     */
+                    DB::table('contact_aliases')
+                        ->where('user_id', $userId)
+                        ->where(
+                            'contact_id',
+                            $targetContactId
+                        )
+                        ->where(
+                            'normalized_name',
+                            $targetNormalizedName
+                        )
+                        ->delete();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | 6. Limpar referências à origem
+                    |--------------------------------------------------------------------------
+                    |
+                    | Só toca nos contatos que apontavam diretamente
+                    | para a origem. Não executa nova análise global.
+                    |
+                    */
+
+                    $clearedSuggestions = DB::table(
+                        'contacts'
+                    )
+                        ->where('user_id', $userId)
+                        ->where(
+                            'looks_like_contact_id',
+                            $sourceContactId
+                        )
+                        ->update([
+                            'looks_like_contact_id' =>
+                                null,
+
+                            'updated_at' =>
+                                now(),
+                        ]);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | 7. Excluir a origem
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $deleted = DB::table('contacts')
+                        ->where('user_id', $userId)
+                        ->where('id', $sourceContactId)
+                        ->delete();
+
+                    if ($deleted !== 1) {
+                        throw ValidationException::withMessages([
+                            'contacts' =>
+                                'Não foi possível excluir o contato de origem.',
+                        ]);
+                    }
+
+                    Log::info(
+                        'Dados da mesclagem de contatos.',
+                        [
+                            'user_id' =>
+                                $userId,
+
+                            'source_contact_id' =>
+                                $sourceContactId,
+
+                            'target_contact_id' =>
+                                $targetContactId,
+
+                            'moved_transactions' =>
+                                $movedTransactions,
+
+                            'source_aliases' =>
+                                $sourceAliases->count(),
+
+                            'aliases_inserted_or_ignored' =>
+                                count($aliasRows),
+
+                            'cleared_similarity_references' =>
+                                $clearedSuggestions,
+                        ]
+                    );
+
+                    return $targetContactId;
+                },
+                attempts: 3
+            );
 
             /*
-            |--------------------------------------------------------------------------
-            | 5. Redirecionar sugestões que apontavam para a origem
-            |--------------------------------------------------------------------------
-            */
-
-            Contact::query()
-                ->where('user_id', $userId)
-                ->where(
-                    'looks_like_contact_id',
-                    $source->id
-                )
-                ->update([
-                    'looks_like_contact_id' =>
-                        $target->id,
-
-                    'updated_at' => now(),
-                ]);
-
-            /*
-             * Remove qualquer sugestão do destino para a origem.
+             * Carrega o contato final somente após o commit.
              */
-            if (
-                $target->looks_like_contact_id
-                === $source->id
-            ) {
-                $target->update([
-                    'looks_like_contact_id' => null,
-                ]);
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | 6. Remover alias conflitante com o nome oficial do destino
-            |--------------------------------------------------------------------------
-            |
-            | O nome oficial não precisa também existir como alias.
-            |
-            */
-
-            $targetNormalizedName =
-                ContactNameNormalizer::normalize(
-                    $target->name
-                );
-
-            ContactAlias::query()
+            $contact = Contact::query()
                 ->where('user_id', $userId)
-                ->where(
-                    'contact_id',
-                    $target->id
-                )
-                ->where(
-                    'normalized_name',
-                    $targetNormalizedName
-                )
-                ->delete();
+                ->with([
+                    'aliases',
+                    'defaultExpenseCategory',
+                    'defaultIncomeCategory',
+                ])
+                ->findOrFail($resultContactId);
 
-            /*
-            |--------------------------------------------------------------------------
-            | 7. Excluir o contato de origem
-            |--------------------------------------------------------------------------
-            */
+            Log::info(
+                'Mesclagem de contatos concluída.',
+                [
+                    'user_id' =>
+                        $userId,
 
-            $source->delete();
+                    'source_contact_id' =>
+                        $sourceContactId,
 
-            return $target->fresh([
-                'aliases',
-                'defaultExpenseCategory',
-                'defaultIncomeCategory',
-            ]);
-        });
+                    'target_contact_id' =>
+                        $targetContactId,
+
+                    'seconds' => round(
+                        microtime(true) - $startedAt,
+                        3
+                    ),
+                ]
+            );
+
+            return $contact;
+        } catch (Throwable $exception) {
+            Log::error(
+                'Erro ao mesclar contatos.',
+                [
+                    'user_id' =>
+                        $userId,
+
+                    'source_contact_id' =>
+                        $sourceContactId,
+
+                    'target_contact_id' =>
+                        $targetContactId,
+
+                    'message' =>
+                        $exception->getMessage(),
+
+                    'exception' =>
+                        $exception,
+                ]
+            );
+
+            throw $exception;
+        }
     }
 
     /**
-     * Verifica conflitos que tornam a mesclagem insegura.
+     * Verifica se os dois contatos podem ser mesclados.
      */
     private function ensureContactsCanBeMerged(
-        Contact $source,
-        Contact $target
+        object $source,
+        object $target
     ): void {
         if (
-            $source->contact_type !== null
-            && $target->contact_type !== null
+            $this->filled($source->contact_type)
+            && $this->filled($target->contact_type)
             && $source->contact_type
             !== $target->contact_type
         ) {
@@ -272,8 +464,12 @@ class ContactMergeService
         }
 
         if (
-            $this->hasCompleteDocument($source)
-            && $this->hasCompleteDocument($target)
+            $this->hasCompleteDocument(
+                $source->document
+            )
+            && $this->hasCompleteDocument(
+                $target->document
+            )
             && $source->document
             !== $target->document
         ) {
@@ -285,83 +481,110 @@ class ContactMergeService
     }
 
     /**
-     * Cria um alias a partir do nome antigo.
+     * Verifica conflitos de aliases em uma única consulta.
+     *
+     * Aliases pertencentes à origem ou ao destino são válidos.
+     * Apenas aliases de terceiros impedem a mesclagem.
+     *
+     * @param array<int, array<string, mixed>> $aliasRows
      */
-    private function createAliasFromName(
+    private function validateAliasConflicts(
         int $userId,
-        int $contactId,
-        string $name
+        int $sourceContactId,
+        int $targetContactId,
+        array $aliasRows
     ): void {
-        $normalizedName =
-            ContactNameNormalizer::normalize(
-                $name
-            );
-
-        if ($normalizedName === '') {
+        if (empty($aliasRows)) {
             return;
         }
 
-        /*
-         * O nome oficial do destino não precisa virar alias.
-         */
-        $target = Contact::query()
-            ->where('user_id', $userId)
-            ->where('id', $contactId)
-            ->firstOrFail();
-
-        if (
-            ContactNameNormalizer::equals(
-                $target->name,
-                $name
+        $normalizedNames = array_values(
+            array_unique(
+                array_column(
+                    $aliasRows,
+                    'normalized_name'
+                )
             )
-        ) {
-            return;
-        }
+        );
 
-        $existingAlias = ContactAlias::query()
+        $conflict = DB::table('contact_aliases')
             ->where('user_id', $userId)
-            ->where(
+            ->whereIn(
                 'normalized_name',
-                $normalizedName
+                $normalizedNames
             )
-            ->first();
-
-        if ($existingAlias) {
-            if (
-                $existingAlias->contact_id
-                === $contactId
-            ) {
-                return;
-            }
-
-            throw ValidationException::withMessages([
-                'aliases' =>
-                    "O apelido \"{$name}\" já pertence a outro contato.",
+            ->whereNotIn('contact_id', [
+                $sourceContactId,
+                $targetContactId,
+            ])
+            ->first([
+                'name',
+                'contact_id',
             ]);
+
+        if (!$conflict) {
+            return;
         }
 
-        ContactAlias::create([
-            'user_id' => $userId,
-            'contact_id' => $contactId,
-            'name' => trim($name),
-            'normalized_name' =>
-                $normalizedName,
+        throw ValidationException::withMessages([
+            'aliases' =>
+                "O apelido \"{$conflict->name}\" já pertence a outro contato.",
         ]);
     }
 
     /**
-     * Verifica se o contato possui CPF ou CNPJ completo.
+     * Remove aliases repetidos do lote.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
      */
+    private function uniqueAliasRows(
+        array $rows
+    ): array {
+        $unique = [];
+
+        foreach ($rows as $row) {
+            $normalizedName =
+                $row['normalized_name']
+                ?? '';
+
+            if ($normalizedName === '') {
+                continue;
+            }
+
+            $unique[$normalizedName] =
+                $row;
+        }
+
+        return array_values($unique);
+    }
+
     private function hasCompleteDocument(
-        Contact $contact
+        ?string $document
     ): bool {
-        if (!$contact->document) {
+        if (!$document) {
             return false;
         }
 
         return preg_match(
             '/^(\d{11}|\d{14})$/',
-            $contact->document
+            $document
         ) === 1;
+    }
+
+    private function firstFilled(
+        mixed $preferred,
+        mixed $fallback
+    ): mixed {
+        return $this->filled($preferred)
+            ? $preferred
+            : $fallback;
+    }
+
+    private function filled(
+        mixed $value
+    ): bool {
+        return $value !== null
+            && $value !== '';
     }
 }

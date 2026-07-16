@@ -7,50 +7,55 @@ $rows = ["Data,Valor,Identificador,Descrição"];
 $timestamp = strtotime('2026-05-02 08:00:00');
 
 $nomes = [
-    'COMERCIAL SAO BERNARDO LTDA', 
-    'Leandro Oliveira Cardoso', 
-    'Valdivan Santos Almeida', 
-    'Maria Silva Santos', 
-    'Mercadinho Preço Bom', 
+    'COMERCIAL SAO BERNARDO LTDA',
+    'Leandro Oliveira Cardoso',
+    'Valdivan Santos Almeida',
+    'Maria Silva Santos',
+    'Mercadinho Preço Bom',
     'Ana Paula Lima'
 ];
 
 $bancos = [
-    'BCO DO BRASIL S.A. (0001) Agência: 2555 Conta: 39716-4', 
-    'NU PAGAMENTOS - IP (0260) Agência: 1 Conta: 77345795-4', 
-    'ITAU UNIBANCO S.A. (0341) Agência: 0100 Conta: 12345-6', 
+    'BCO DO BRASIL S.A. (0001) Agência: 2555 Conta: 39716-4',
+    'NU PAGAMENTOS - IP (0260) Agência: 1 Conta: 77345795-4',
+    'ITAU UNIBANCO S.A. (0341) Agência: 0100 Conta: 12345-6',
     'BANCO BRADESCO S.A. (0237) Agência: 1234 Conta: 56789-0'
 ];
 
 echo "Gerando 1000 linhas de transações no formato exato...\n";
 
-for ($i = 0; $i < 1000; $i++) {
+for ($i = 0; $i < 40000; $i++) {
     // Incrementa o tempo para mudar as datas/horas
     $current_time = $timestamp + ($i * 15 * 60);
     $date = date('d/m/Y', $current_time);
-    
+
     // Define valores reais
-    $isNegative = rand(0, 100) > 30; 
+    $isNegative = rand(0, 100) > 30;
     $valor = ($isNegative ? '-' : '') . number_format(rand(10, 500) + (rand(0, 99) / 100), 2, '.', '');
-    
+
     // Gera um UUID/Hash idêntico ao do seu exemplo
-    $identificador = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-        rand(0, 0xffff), rand(0, 0xffff),
+    $identificador = sprintf(
+        '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+        rand(0, 0xffff),
+        rand(0, 0xffff),
         rand(0, 0xffff),
         rand(0, 0x0fff) | 0x4000,
         rand(0, 0x3fff) | 0x8000,
-        rand(0, 0xffff), rand(0, 0xffff), rand(0, 0xffff)
+        rand(0, 0xffff),
+        rand(0, 0xffff),
+        rand(0, 0xffff)
     );
-    
-    $nome = $nomes[array_rand($nomes)];
+
+    $r = rand(1, 50);
+    $nome = $nomes[array_rand($nomes)] . '' . strval($r);
     $banco = $bancos[array_rand($bancos)];
     $doc = (rand(0, 1) === 0) ? '11.289.988/0001-77' : '•••.349.203-••';
-    
+
     $metodo = "Transferência " . ($isNegative ? "enviada" : "recebida") . " pelo Pix";
-    
+
     // Monta a string de Descrição com os hífens exatos
     $desc = "{$metodo} - {$nome} - {$doc} - {$banco}";
-    
+
     // Junta as 4 colunas protegendo a descrição com aspas
     $rows[] = "{$date},{$valor},{$identificador},{$desc}";
 }
@@ -61,6 +66,6 @@ $content = implode("\n", $rows);
 // Força o arquivo a ser salvo estritamente em UTF-8 para evitar problemas de encoding
 $content = mb_convert_encoding($content, 'UTF-8', mb_detect_encoding($content));
 
-file_put_contents('import_teste_1000.csv', $content);
+file_put_contents('import_teste_40k.csv', $content);
 
-echo "Sucesso! Arquivo 'import_teste_1000.csv' gerado com 1000 linhas idênticas ao seu modelo.\n";
+echo "Sucesso! Arquivo 'import_teste_40k.csv' gerado com 40k linhas idênticas ao seu modelo.\n";
