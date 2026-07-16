@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
-import { 
-    BookOpen, 
-    FolderGit2, 
+import {
+    BookOpen,
+    FolderGit2,
     LayoutGrid,
     ReceiptText,
     ContactRound,
@@ -24,11 +24,6 @@ import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
 const mainNavItems = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-        icon: LayoutGrid,
-    },
     {
         title: 'Importações',
         href: '/imports',
