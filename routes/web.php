@@ -1,62 +1,120 @@
 <?php
 
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ImportController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ImportPageController;
 use App\Http\Controllers\TransactionController;
-use App\Http\Controllers\ContactController;
-
-Route::inertia('/', 'welcome')->name('home');
-
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
-});
-
-Route::get('/imports', [ImportController::class, 'index']);
-
-
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', function () {
-        return inertia('dashboard');
-    })->name('dashboard');
-
-    Route::get('/imports', [ImportPageController::class, 'index'])
-        ->name('imports.index');
-});
-
-Route::get('/transactions', [TransactionController::class, 'index'])
-    ->name('transactions.index');
-
-Route::patch(
-    '/transactions/{transaction}/category',
-    [TransactionController::class, 'updateCategory']
-)->name('transactions.category.update');
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Contatos
+| Página pública
 |--------------------------------------------------------------------------
 */
 
-Route::get(
-    '/contacts',
-    [ContactController::class, 'index']
-)->name('contacts.index');
+Route::inertia('/', 'welcome')
+    ->name('home');
 
-Route::patch(
-    '/contacts/{contact}',
-    [ContactController::class, 'update']
-)->name('contacts.update');
+/*
+|--------------------------------------------------------------------------
+| Rotas autenticadas
+|--------------------------------------------------------------------------
+*/
 
-Route::patch(
-    '/contacts/{contact}/dismiss-similarity',
-    [ContactController::class, 'dismissSimilarity']
-)->name('contacts.similarity.dismiss');
+Route::middleware([
+    'auth',
+    'verified',
+])->group(function (): void {
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard
+    |--------------------------------------------------------------------------
+    */
 
-Route::post(
-    '/contacts/{contact}/merge',
-    [ContactController::class, 'merge']
-)->name('contacts.merge');
+    Route::inertia(
+        '/dashboard',
+        'dashboard'
+    )->name('dashboard');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Importações
+    |--------------------------------------------------------------------------
+    |
+    | GET /imports
+    | Abre a página Inertia.
+    |
+    | GET /imports/list
+    | Retorna as importações em JSON para o frontend.
+    |
+    | POST /imports
+    | Recebe e processa o arquivo.
+    |
+    */
+
+    Route::get(
+        '/imports',
+        [ImportPageController::class, 'index']
+    )->name('imports.index');
+
+    Route::post(
+        '/imports',
+        [ImportController::class, 'store']
+    )->name('imports.store');
+
+    Route::delete(
+        '/imports/{import}',
+        [ImportController::class, 'destroy']
+    )
+        ->whereNumber('import')
+        ->name('imports.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Transações
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/transactions',
+        [TransactionController::class, 'index']
+    )->name('transactions.index');
+
+    Route::patch(
+        '/transactions/{transaction}/category',
+        [TransactionController::class, 'updateCategory']
+    )
+        ->whereNumber('transaction')
+        ->name('transactions.category.update');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Contatos
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/contacts',
+        [ContactController::class, 'index']
+    )->name('contacts.index');
+
+    Route::patch(
+        '/contacts/{contact}',
+        [ContactController::class, 'update']
+    )
+        ->whereNumber('contact')
+        ->name('contacts.update');
+
+    Route::post(
+        '/contacts/merge-many',
+        [ContactController::class, 'mergeMany']
+    )->name('contacts.merge-many');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Configurações
+|--------------------------------------------------------------------------
+*/
 
 require __DIR__ . '/settings.php';
-

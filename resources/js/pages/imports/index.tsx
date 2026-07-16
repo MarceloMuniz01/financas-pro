@@ -1,14 +1,22 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
+import {
+    Head,
+    router,
+    usePage,
+} from '@inertiajs/react';
 import {
     ChangeEvent,
     FormEvent,
-    useCallback,
     useEffect,
+    useRef,
     useState,
 } from 'react';
 
-type ImportStatus = 'pending' | 'processing' | 'done' | 'failed';
+type ImportStatus =
+    | 'pending'
+    | 'processing'
+    | 'done'
+    | 'failed';
 
 type ImportItem = {
     id: number;
@@ -21,9 +29,37 @@ type ImportItem = {
     created_at: string;
 };
 
-type UploadResponse = {
-    message: string;
-    import?: ImportItem;
+type PaginationLink = {
+    url: string | null;
+    label: string;
+    active: boolean;
+};
+
+type PaginatedImports = {
+    data: ImportItem[];
+
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+
+    from: number | null;
+    to: number | null;
+
+    links: PaginationLink[];
+};
+
+type FlashMessages = {
+    success?: string;
+    error?: string;
+};
+
+type PageProps = {
+    flash?: FlashMessages;
+};
+
+type Props = {
+    imports: PaginatedImports;
 };
 
 const breadcrumbs = [
@@ -33,127 +69,145 @@ const breadcrumbs = [
     },
 ];
 
-export default function ImportsIndex() {
-    const [file, setFile] = useState<File | null>(null);
-    const [imports, setImports] = useState<ImportItem[]>([]);
+export default function ImportsIndex({
+    imports,
+}: Props) {
+    const page = usePage<PageProps>();
 
-    const [isLoading, setIsLoading] = useState(true);
-    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef =
+        useRef<HTMLInputElement | null>(null);
 
-    const [message, setMessage] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [file, setFile] =
+        useState<File | null>(null);
 
-    const loadImports = useCallback(async () => {
-        try {
-            const response = await fetch('/api/imports', {
-                headers: {
-                    Accept: 'application/json',
-                },
-            });
+    const [isUploading, setIsUploading] =
+        useState(false);
 
-            if (!response.ok) {
-                throw new Error('Não foi possível carregar as importações.');
-            }
+    const [clientError, setClientError] =
+        useState<string | null>(null);
 
-            const data: ImportItem[] = await response.json();
+    const successMessage =
+        page.props.flash?.success ?? null;
 
-            setImports(data);
-        } catch (requestError) {
-            setError(
-                requestError instanceof Error
-                    ? requestError.message
-                    : 'Erro ao carregar as importações.',
-            );
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    const serverError =
+        page.props.flash?.error ?? null;
 
-    useEffect(() => {
-        loadImports();
-    }, [loadImports]);
+    /*
+     * Caso algum processamento antigo ainda esteja
+     * marcado como pending ou processing, atualiza somente
+     * a prop imports periodicamente.
+     *
+     * No processamento síncrono atual normalmente a resposta
+     * já volta como done ou failed.
+     */
+    const hasActiveImport = imports.data.some(
+        (item) =>
+            item.status === 'pending'
+            || item.status === 'processing',
+    );
 
     useEffect(() => {
-        const hasActiveImport = imports.some(
-            (item) =>
-                item.status === 'pending' ||
-                item.status === 'processing',
-        );
-
         if (!hasActiveImport) {
             return;
         }
 
-        const intervalId = window.setInterval(() => {
-            loadImports();
-        }, 2000);
+        const intervalId = window.setInterval(
+            () => {
+                router.reload({
+                    only: ['imports'],
+                    preserveScroll: true,
+                    preserveState: true,
+                });
+            },
+            3000,
+        );
 
         return () => {
             window.clearInterval(intervalId);
         };
-    }, [imports, loadImports]);
+    }, [hasActiveImport]);
 
-    function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-        const selectedFile = event.target.files?.[0] ?? null;
+    function handleFileChange(
+        event: ChangeEvent<HTMLInputElement>,
+    ) {
+        const selectedFile =
+            event.target.files?.[0] ?? null;
 
         setFile(selectedFile);
-        setMessage(null);
-        setError(null);
+        setClientError(null);
     }
 
-    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    function handleSubmit(
+        event: FormEvent<HTMLFormElement>,
+    ) {
         event.preventDefault();
 
         if (!file) {
-            setError('Selecione um arquivo CSV.');
+            setClientError(
+                'Selecione um arquivo de extrato.',
+            );
+
+            return;
+        }
+
+        const extension =
+            file.name
+                .split('.')
+                .pop()
+                ?.toLowerCase()
+            ?? '';
+
+        const acceptedExtensions = [
+            'csv',
+            'txt',
+            'ofx',
+        ];
+
+        if (
+            !acceptedExtensions.includes(extension)
+        ) {
+            setClientError(
+                'Selecione um arquivo CSV, TXT ou OFX.',
+            );
+
             return;
         }
 
         setIsUploading(true);
-        setMessage(null);
-        setError(null);
+        setClientError(null);
 
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
+        router.post(
+            '/imports',
+            {
+                file,
+            },
+            {
+                forceFormData: true,
+                preserveScroll: true,
 
-            const response = await fetch('/api/imports', {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
+                onSuccess: () => {
+                    setFile(null);
+
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                    }
                 },
-                body: formData,
-            });
 
-            const data: UploadResponse = await response.json();
+                onError: (errors) => {
+                    const firstError =
+                        errors.file
+                        || errors.import
+                        || errors.message
+                        || 'Não foi possível importar o arquivo.';
 
-            if (!response.ok) {
-                throw new Error(
-                    data.message || 'Não foi possível enviar o arquivo.',
-                );
-            }
+                    setClientError(firstError);
+                },
 
-            setMessage(data.message);
-            setFile(null);
-
-            const input = document.getElementById(
-                'statement-file',
-            ) as HTMLInputElement | null;
-
-            if (input) {
-                input.value = '';
-            }
-
-            await loadImports();
-        } catch (requestError) {
-            setError(
-                requestError instanceof Error
-                    ? requestError.message
-                    : 'Erro ao enviar o arquivo.',
-            );
-        } finally {
-            setIsUploading(false);
-        }
+                onFinish: () => {
+                    setIsUploading(false);
+                },
+            },
+        );
     }
 
     return (
@@ -168,7 +222,9 @@ export default function ImportsIndex() {
                         </h1>
 
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Envie um extrato CSV do Nubank ou Banco Inter.
+                            Envie seu extrato bancário. O banco será
+                            identificado automaticamente pelo conteúdo
+                            do arquivo.
                         </p>
                     </div>
 
@@ -185,126 +241,202 @@ export default function ImportsIndex() {
                             </label>
 
                             <input
+                                ref={fileInputRef}
                                 id="statement-file"
                                 type="file"
-                                accept=".csv,.txt,text/csv"
+                                accept=".csv,.txt,.ofx,text/csv,text/plain,application/x-ofx"
                                 onChange={handleFileChange}
                                 disabled={isUploading}
-                                className="block w-full rounded-md border px-3 py-2 text-sm"
+                                className="block w-full rounded-md border bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                             />
 
+                            <p className="text-xs text-muted-foreground">
+                                Formatos aceitos: CSV, TXT e OFX.
+                            </p>
+
                             {file && (
-                                <p className="text-sm text-muted-foreground">
-                                    Selecionado: {file.name}
-                                </p>
+                                <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                                    <span className="text-muted-foreground">
+                                        Arquivo selecionado:
+                                    </span>{' '}
+
+                                    <span className="font-medium">
+                                        {file.name}
+                                    </span>
+
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                        ({formatFileSize(file.size)})
+                                    </span>
+                                </div>
                             )}
                         </div>
 
-                        {message && (
+                        {successMessage && (
                             <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                                {message}
+                                {successMessage}
                             </div>
                         )}
 
-                        {error && (
+                        {(clientError || serverError) && (
                             <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                                {error}
+                                {clientError || serverError}
                             </div>
                         )}
 
                         <div>
                             <button
                                 type="submit"
-                                disabled={!file || isUploading}
+                                disabled={
+                                    !file
+                                    || isUploading
+                                }
                                 className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isUploading
-                                    ? 'Enviando...'
+                                    ? 'Importando extrato...'
                                     : 'Importar extrato'}
                             </button>
                         </div>
+
+                        {isUploading && (
+                            <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                                O arquivo está sendo processado. Não
+                                feche nem atualize esta página até a
+                                importação terminar.
+                            </div>
+                        )}
                     </form>
                 </section>
 
-                <section className="rounded-xl border bg-card shadow-sm">
+                <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
                     <div className="border-b p-6">
-                        <h2 className="text-lg font-semibold">
-                            Importações recentes
-                        </h2>
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold">
+                                    Importações recentes
+                                </h2>
 
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Acompanhe o processamento dos arquivos enviados.
-                        </p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Histórico dos arquivos enviados e
+                                    processados.
+                                </p>
+                            </div>
+
+                            <span className="text-sm text-muted-foreground">
+                                {imports.total === 1
+                                    ? '1 importação'
+                                    : `${imports.total} importações`}
+                            </span>
+                        </div>
                     </div>
 
-                    {isLoading ? (
-                        <div className="p-6 text-sm text-muted-foreground">
-                            Carregando importações...
-                        </div>
-                    ) : imports.length === 0 ? (
-                        <div className="p-6 text-sm text-muted-foreground">
-                            Nenhuma importação realizada.
+                    {imports.data.length === 0 ? (
+                        <div className="p-8 text-center">
+                            <p className="text-sm font-medium">
+                                Nenhuma importação realizada
+                            </p>
+
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Envie seu primeiro extrato usando o
+                                formulário acima.
+                            </p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead className="border-b bg-muted/50">
-                                    <tr>
-                                        <th className="px-6 py-3 font-medium">
-                                            Arquivo
-                                        </th>
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[800px] text-left text-sm">
+                                    <thead className="border-b bg-muted/50">
+                                        <tr>
+                                            <th className="px-6 py-3 font-medium">
+                                                Arquivo
+                                            </th>
 
-                                        <th className="px-6 py-3 font-medium">
-                                            Banco
-                                        </th>
+                                            <th className="px-6 py-3 font-medium">
+                                                Banco
+                                            </th>
 
-                                        <th className="px-6 py-3 font-medium">
-                                            Status
-                                        </th>
+                                            <th className="px-6 py-3 font-medium">
+                                                Origem
+                                            </th>
 
-                                        <th className="px-6 py-3 font-medium">
-                                            Enviado em
-                                        </th>
-                                    </tr>
-                                </thead>
+                                            <th className="px-6 py-3 font-medium">
+                                                Status
+                                            </th>
 
-                                <tbody>
-                                    {imports.map((item) => (
-                                        <tr
-                                            key={item.id}
-                                            className="border-b last:border-b-0"
-                                        >
-                                            <td className="px-6 py-4">
-                                                <div className="font-medium">
-                                                    {item.original_filename ||
-                                                        'Arquivo sem nome'}
-                                                </div>
+                                            <th className="px-6 py-3 font-medium">
+                                                Enviado em
+                                            </th>
 
-                                                {item.error_message && (
-                                                    <div className="mt-1 max-w-md text-xs text-red-600">
-                                                        {item.error_message}
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            <td className="px-6 py-4 capitalize">
-                                                {formatBank(item.bank)}
-                                            </td>
-
-                                            <td className="px-6 py-4">
-                                                <StatusBadge
-                                                    status={item.status}
-                                                />
-                                            </td>
-
-                                            <td className="px-6 py-4 text-muted-foreground">
-                                                {formatDate(item.created_at)}
-                                            </td>
+                                            <th className="px-6 py-3 font-medium">
+                                                Finalizado em
+                                            </th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+
+                                    <tbody>
+                                        {imports.data.map(
+                                            (item) => (
+                                                <tr
+                                                    key={item.id}
+                                                    className="border-b last:border-b-0 hover:bg-muted/30"
+                                                >
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-medium">
+                                                            {item.original_filename
+                                                                || 'Arquivo sem nome'}
+                                                        </div>
+
+                                                        {item.error_message && (
+                                                            <div className="mt-1 max-w-md text-xs leading-relaxed text-red-600">
+                                                                {
+                                                                    item.error_message
+                                                                }
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-6 py-4">
+                                                        {formatBank(
+                                                            item.bank,
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-6 py-4 uppercase text-muted-foreground">
+                                                        {item.source}
+                                                    </td>
+
+                                                    <td className="px-6 py-4">
+                                                        <StatusBadge
+                                                            status={
+                                                                item.status
+                                                            }
+                                                        />
+                                                    </td>
+
+                                                    <td className="px-6 py-4 text-muted-foreground">
+                                                        {formatDate(
+                                                            item.created_at,
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-6 py-4 text-muted-foreground">
+                                                        {item.processed_at
+                                                            ? formatDate(
+                                                                item.processed_at,
+                                                            )
+                                                            : '—'}
+                                                    </td>
+                                                </tr>
+                                            ),
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <Pagination
+                                imports={imports}
+                            />
+                        </>
                     )}
                 </section>
             </div>
@@ -312,7 +444,11 @@ export default function ImportsIndex() {
     );
 }
 
-function StatusBadge({ status }: { status: ImportStatus }) {
+function StatusBadge({
+    status,
+}: {
+    status: ImportStatus;
+}) {
     const labels: Record<ImportStatus, string> = {
         pending: 'Aguardando',
         processing: 'Processando',
@@ -321,10 +457,17 @@ function StatusBadge({ status }: { status: ImportStatus }) {
     };
 
     const classes: Record<ImportStatus, string> = {
-        pending: 'bg-yellow-100 text-yellow-800',
-        processing: 'bg-blue-100 text-blue-800',
-        done: 'bg-green-100 text-green-800',
-        failed: 'bg-red-100 text-red-800',
+        pending:
+            'bg-yellow-100 text-yellow-800',
+
+        processing:
+            'bg-blue-100 text-blue-800',
+
+        done:
+            'bg-green-100 text-green-800',
+
+        failed:
+            'bg-red-100 text-red-800',
     };
 
     return (
@@ -336,7 +479,63 @@ function StatusBadge({ status }: { status: ImportStatus }) {
     );
 }
 
-function formatBank(bank: string | null): string {
+function Pagination({
+    imports,
+}: {
+    imports: PaginatedImports;
+}) {
+    if (imports.last_page <= 1) {
+        return null;
+    }
+
+    return (
+        <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between md:px-6">
+            <p className="text-sm text-muted-foreground">
+                Exibindo {imports.from ?? 0} até{' '}
+                {imports.to ?? 0} de {imports.total}
+            </p>
+
+            <div className="flex flex-wrap gap-1">
+                {imports.links.map(
+                    (link, index) => (
+                        <button
+                            key={`${link.label}-${index}`}
+                            type="button"
+                            disabled={!link.url}
+                            onClick={() => {
+                                if (!link.url) {
+                                    return;
+                                }
+
+                                router.visit(
+                                    link.url,
+                                    {
+                                        preserveScroll:
+                                            true,
+
+                                        preserveState:
+                                            true,
+                                    },
+                                );
+                            }}
+                            className={`min-w-9 rounded-md border px-3 py-2 text-sm ${link.active
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-background hover:bg-muted'
+                                } disabled:cursor-not-allowed disabled:opacity-40`}
+                            dangerouslySetInnerHTML={{
+                                __html: link.label,
+                            }}
+                        />
+                    ),
+                )}
+            </div>
+        </div>
+    );
+}
+
+function formatBank(
+    bank: string | null,
+): string {
     if (!bank) {
         return 'Não identificado';
     }
@@ -344,14 +543,40 @@ function formatBank(bank: string | null): string {
     const banks: Record<string, string> = {
         nubank: 'Nubank',
         inter: 'Banco Inter',
+        santander: 'Santander',
     };
 
     return banks[bank] ?? bank;
 }
 
-function formatDate(value: string): string {
-    return new Intl.DateTimeFormat('pt-BR', {
-        dateStyle: 'short',
-        timeStyle: 'short',
-    }).format(new Date(value));
+function formatDate(
+    value: string,
+): string {
+    return new Intl.DateTimeFormat(
+        'pt-BR',
+        {
+            dateStyle: 'short',
+            timeStyle: 'short',
+        },
+    ).format(new Date(value));
+}
+
+function formatFileSize(
+    bytes: number,
+): string {
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+
+    if (bytes < 1024 * 1024) {
+        return `${(
+            bytes / 1024
+        ).toFixed(1)} KB`;
+    }
+
+    return `${(
+        bytes
+        / 1024
+        / 1024
+    ).toFixed(1)} MB`;
 }

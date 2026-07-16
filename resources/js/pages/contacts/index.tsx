@@ -1,25 +1,12 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, router, usePage } from '@inertiajs/react';
-import {
-    FormEvent,
-    useEffect,
-    useMemo,
-    useState,
-} from 'react';
+import AppLayout from "@/layouts/app-layout";
+import { Head, router, usePage } from "@inertiajs/react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
-type ContactType =
-    | 'company'
-    | 'individual'
-    | null;
+type ContactType = "company" | "individual" | null;
 
-type EditableContactType =
-    | 'company'
-    | 'individual'
-    | '';
+type EditableContactType = "company" | "individual" | "";
 
-type CategoryType =
-    | 'expense'
-    | 'income';
+type CategoryType = "expense" | "income";
 
 type CategoryItem = {
     id: number;
@@ -32,23 +19,6 @@ type ContactAlias = {
     id: number;
     name: string;
     normalized_name: string;
-};
-
-type SimilarContact = {
-    id: number;
-    name: string;
-    document: string | null;
-    contact_type: ContactType;
-
-    default_expense_category_id: number | null;
-    default_income_category_id: number | null;
-
-    default_expense_category: CategoryItem | null;
-    default_income_category: CategoryItem | null;
-
-    aliases: ContactAlias[];
-
-    transactions_count: number;
 };
 
 type ContactItem = {
@@ -64,8 +34,6 @@ type ContactItem = {
     default_income_category: CategoryItem | null;
 
     aliases: ContactAlias[];
-
-    looks_like_contact: SimilarContact | null;
 
     transactions_count: number;
 };
@@ -110,14 +78,10 @@ type Props = {
     filters: Filters;
 };
 
-type MergeDirection =
-    | 'current_into_similar'
-    | 'similar_into_current';
-
 const breadcrumbs = [
     {
-        title: 'Contatos',
-        href: '/contacts',
+        title: "Contatos",
+        href: "/contacts",
     },
 ];
 
@@ -128,47 +92,77 @@ export default function ContactsIndex({
 }: Props) {
     const page = usePage<PageProps>();
 
-    const successMessage =
-        page.props.flash?.success ?? null;
+    const successMessage = page.props.flash?.success ?? null;
 
-    const errorMessage =
-        page.props.flash?.error ?? null;
+    const errorMessage = page.props.flash?.error ?? null;
 
-    const [search, setSearch] = useState(
-        filters.search,
+    const [search, setSearch] = useState(filters.search);
+
+    const [contactType, setContactType] = useState(filters.contact_type);
+
+    const [editingContact, setEditingContact] = useState<ContactItem | null>(
+        null,
     );
 
-    const [contactType, setContactType] = useState(
-        filters.contact_type,
-    );
+    const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
 
-    const [
-        editingContact,
-        setEditingContact,
-    ] = useState<ContactItem | null>(null);
-
-    const [
-        similarityContact,
-        setSimilarityContact,
-    ] = useState<ContactItem | null>(null);
+    const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
 
     useEffect(() => {
         setSearch(filters.search);
         setContactType(filters.contact_type);
     }, [filters]);
 
-    function handleSubmit(
-        event: FormEvent<HTMLFormElement>,
-    ) {
+    useEffect(() => {
+        const visibleIds = new Set(contacts.data.map((contact) => contact.id));
+
+        setSelectedContactIds((current) =>
+            current.filter((id) => visibleIds.has(id)),
+        );
+    }, [contacts.data]);
+
+    const selectedContacts = useMemo(
+        () =>
+            contacts.data.filter((contact) =>
+                selectedContactIds.includes(contact.id),
+            ),
+        [contacts.data, selectedContactIds],
+    );
+
+    const allPageContactsSelected =
+        contacts.data.length > 0 &&
+        contacts.data.every((contact) => selectedContactIds.includes(contact.id));
+
+    function toggleContactSelection(contactId: number) {
+        setSelectedContactIds((current) =>
+            current.includes(contactId)
+                ? current.filter((id) => id !== contactId)
+                : [...current, contactId],
+        );
+    }
+
+    function togglePageSelection() {
+        if (allPageContactsSelected) {
+            setSelectedContactIds([]);
+            return;
+        }
+
+        setSelectedContactIds(contacts.data.map((contact) => contact.id));
+    }
+
+    function clearSelection() {
+        setSelectedContactIds([]);
+    }
+
+    function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
         router.get(
-            '/contacts',
+            "/contacts",
             {
                 search: search || undefined,
 
-                contact_type:
-                    contactType || undefined,
+                contact_type: contactType || undefined,
             },
             {
                 preserveState: true,
@@ -179,11 +173,11 @@ export default function ContactsIndex({
     }
 
     function handleClearFilters() {
-        setSearch('');
-        setContactType('');
+        setSearch("");
+        setContactType("");
 
         router.get(
-            '/contacts',
+            "/contacts",
             {},
             {
                 preserveState: false,
@@ -199,13 +193,11 @@ export default function ContactsIndex({
 
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <header>
-                    <h1 className="text-2xl font-semibold">
-                        Contatos
-                    </h1>
+                    <h1 className="text-2xl font-semibold">Contatos</h1>
 
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Gerencie as contrapartes, apelidos e possíveis
-                        duplicidades encontradas nos extratos.
+                        Gerencie as contrapartes, apelidos e mescle contatos que representam
+                        a mesma pessoa ou empresa.
                     </p>
                 </header>
 
@@ -238,11 +230,7 @@ export default function ContactsIndex({
                                 id="search"
                                 type="text"
                                 value={search}
-                                onChange={(event) =>
-                                    setSearch(
-                                        event.target.value,
-                                    )
-                                }
+                                onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Nome, documento ou apelido"
                                 className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                             />
@@ -259,28 +247,16 @@ export default function ContactsIndex({
                             <select
                                 id="contact_type"
                                 value={contactType}
-                                onChange={(event) =>
-                                    setContactType(
-                                        event.target.value,
-                                    )
-                                }
+                                onChange={(event) => setContactType(event.target.value)}
                                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                             >
-                                <option value="">
-                                    Todos
-                                </option>
+                                <option value="">Todos</option>
 
-                                <option value="company">
-                                    Empresas
-                                </option>
+                                <option value="company">Empresas</option>
 
-                                <option value="individual">
-                                    Pessoas
-                                </option>
+                                <option value="individual">Pessoas</option>
 
-                                <option value="unknown">
-                                    Não definido
-                                </option>
+                                <option value="unknown">Não definido</option>
                             </select>
                         </div>
 
@@ -305,21 +281,54 @@ export default function ContactsIndex({
 
                 <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
                     <div className="border-b p-4 md:p-6">
-                        <h2 className="text-lg font-semibold">
-                            Contrapartes
-                        </h2>
+                        <h2 className="text-lg font-semibold">Contrapartes</h2>
 
                         <p className="mt-1 text-sm text-muted-foreground">
                             {contacts.total === 0
-                                ? 'Nenhum contato encontrado.'
+                                ? "Nenhum contato encontrado."
                                 : `${contacts.total} contatos encontrados.`}
                         </p>
                     </div>
 
+                    {selectedContacts.length > 0 && (
+                        <div className="flex flex-col gap-3 border-b bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-6">
+                            <div>
+                                <p className="text-sm font-medium">
+                                    {selectedContacts.length}{" "}
+                                    {selectedContacts.length === 1
+                                        ? "contato selecionado"
+                                        : "contatos selecionados"}
+                                </p>
+
+                                <p className="text-xs text-muted-foreground">
+                                    Selecione pelo menos dois contatos para mesclá-los.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={clearSelection}
+                                    className="h-9 rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted"
+                                >
+                                    Limpar seleção
+                                </button>
+
+                                <button
+                                    type="button"
+                                    disabled={selectedContacts.length < 2}
+                                    onClick={() => setIsMergeModalOpen(true)}
+                                    className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    Mesclar selecionados
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {contacts.data.length === 0 ? (
                         <div className="p-8 text-center text-sm text-muted-foreground">
-                            Nenhum contato corresponde aos filtros
-                            selecionados.
+                            Nenhum contato corresponde aos filtros selecionados.
                         </div>
                     ) : (
                         <>
@@ -327,13 +336,19 @@ export default function ContactsIndex({
                                 <table className="w-full min-w-[1150px] text-left text-sm">
                                     <thead className="border-b bg-muted/50">
                                         <tr>
-                                            <th className="px-4 py-3 font-medium md:px-6">
-                                                Contato
+                                            <th className="w-12 px-4 py-3 text-center font-medium md:pl-6 md:pr-2">
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label="Selecionar todos os contatos desta página"
+                                                    checked={allPageContactsSelected}
+                                                    onChange={togglePageSelection}
+                                                    className="h-4 w-4 rounded border"
+                                                />
                                             </th>
 
-                                            <th className="px-4 py-3 font-medium md:px-6">
-                                                Tipo
-                                            </th>
+                                            <th className="px-4 py-3 font-medium md:px-6">Contato</th>
+
+                                            <th className="px-4 py-3 font-medium md:px-6">Tipo</th>
 
                                             <th className="px-4 py-3 font-medium md:px-6">
                                                 Categoria de despesa
@@ -354,150 +369,100 @@ export default function ContactsIndex({
                                     </thead>
 
                                     <tbody>
-                                        {contacts.data.map(
-                                            (contact) => (
-                                                <tr
-                                                    key={contact.id}
-                                                    className="border-b last:border-b-0 hover:bg-muted/30"
-                                                >
-                                                    <td className="px-4 py-4 md:px-6">
-                                                        <div className="flex items-start gap-2">
-                                                            <div className="min-w-0">
-                                                                <div className="font-medium">
-                                                                    {
-                                                                        contact.name
-                                                                    }
-                                                                </div>
+                                        {contacts.data.map((contact) => (
+                                            <tr
+                                                key={contact.id}
+                                                className="border-b last:border-b-0 hover:bg-muted/30"
+                                            >
+                                                <td className="w-12 px-4 py-4 text-center md:pl-6 md:pr-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        aria-label={`Selecionar ${contact.name}`}
+                                                        checked={selectedContactIds.includes(contact.id)}
+                                                        onChange={() => toggleContactSelection(contact.id)}
+                                                        className="h-4 w-4 rounded border"
+                                                    />
+                                                </td>
 
-                                                                <div className="mt-1 text-xs text-muted-foreground">
-                                                                    {formatStoredDocument(
-                                                                        contact.document,
-                                                                    )}
-                                                                </div>
+                                                <td className="px-4 py-4 md:px-6">
+                                                    <div className="flex items-start gap-2">
+                                                        <div className="min-w-0">
+                                                            <div className="font-medium">{contact.name}</div>
 
-                                                                {contact.aliases.length >
-                                                                    0 && (
-                                                                        <div className="mt-2 flex flex-wrap gap-1">
-                                                                            {contact.aliases
-                                                                                .slice(
-                                                                                    0,
-                                                                                    3,
-                                                                                )
-                                                                                .map(
-                                                                                    (
-                                                                                        alias,
-                                                                                    ) => (
-                                                                                        <span
-                                                                                            key={
-                                                                                                alias.id
-                                                                                            }
-                                                                                            className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
-                                                                                        >
-                                                                                            {
-                                                                                                alias.name
-                                                                                            }
-                                                                                        </span>
-                                                                                    ),
-                                                                                )}
-
-                                                                            {contact
-                                                                                .aliases
-                                                                                .length >
-                                                                                3 && (
-                                                                                    <span className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
-                                                                                        +
-                                                                                        {contact
-                                                                                            .aliases
-                                                                                            .length -
-                                                                                            3}
-                                                                                    </span>
-                                                                                )}
-                                                                        </div>
-                                                                    )}
+                                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                                {formatStoredDocument(contact.document)}
                                                             </div>
 
-                                                            {contact.looks_like_contact && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        setSimilarityContact(
-                                                                            contact,
-                                                                        )
-                                                                    }
-                                                                    title="Possível contato duplicado"
-                                                                    className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 text-xs font-bold text-amber-700 hover:bg-amber-100"
-                                                                >
-                                                                    !
-                                                                </button>
+                                                            {contact.aliases.length > 0 && (
+                                                                <div className="mt-2 flex flex-wrap gap-1">
+                                                                    {contact.aliases.slice(0, 3).map((alias) => (
+                                                                        <span
+                                                                            key={alias.id}
+                                                                            className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
+                                                                        >
+                                                                            {alias.name}
+                                                                        </span>
+                                                                    ))}
+
+                                                                    {contact.aliases.length > 3 && (
+                                                                        <span className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                                            +{contact.aliases.length - 3}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             )}
                                                         </div>
-                                                    </td>
+                                                    </div>
+                                                </td>
 
-                                                    <td className="px-4 py-4 md:px-6">
-                                                        <ContactTypeBadge
-                                                            type={
-                                                                contact.contact_type
-                                                            }
+                                                <td className="px-4 py-4 md:px-6">
+                                                    <ContactTypeBadge type={contact.contact_type} />
+                                                </td>
+
+                                                <td className="px-4 py-4 md:px-6">
+                                                    {contact.default_expense_category ? (
+                                                        <CategoryBadge
+                                                            category={contact.default_expense_category}
                                                         />
-                                                    </td>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            Não definida
+                                                        </span>
+                                                    )}
+                                                </td>
 
-                                                    <td className="px-4 py-4 md:px-6">
-                                                        {contact.default_expense_category ? (
-                                                            <CategoryBadge
-                                                                category={
-                                                                    contact.default_expense_category
-                                                                }
-                                                            />
-                                                        ) : (
-                                                            <span className="text-muted-foreground">
-                                                                Não definida
-                                                            </span>
-                                                        )}
-                                                    </td>
+                                                <td className="px-4 py-4 md:px-6">
+                                                    {contact.default_income_category ? (
+                                                        <CategoryBadge
+                                                            category={contact.default_income_category}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            Não definida
+                                                        </span>
+                                                    )}
+                                                </td>
 
-                                                    <td className="px-4 py-4 md:px-6">
-                                                        {contact.default_income_category ? (
-                                                            <CategoryBadge
-                                                                category={
-                                                                    contact.default_income_category
-                                                                }
-                                                            />
-                                                        ) : (
-                                                            <span className="text-muted-foreground">
-                                                                Não definida
-                                                            </span>
-                                                        )}
-                                                    </td>
+                                                <td className="px-4 py-4 text-center md:px-6">
+                                                    {contact.transactions_count}
+                                                </td>
 
-                                                    <td className="px-4 py-4 text-center md:px-6">
-                                                        {
-                                                            contact.transactions_count
-                                                        }
-                                                    </td>
-
-                                                    <td className="px-4 py-4 text-right md:px-6">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setEditingContact(
-                                                                    contact,
-                                                                )
-                                                            }
-                                                            className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
-                                                        >
-                                                            Editar
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ),
-                                        )}
+                                                <td className="px-4 py-4 text-right md:px-6">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingContact(contact)}
+                                                        className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
 
-                            <Pagination
-                                contacts={contacts}
-                            />
+                            <Pagination contacts={contacts} />
                         </>
                     )}
                 </section>
@@ -507,180 +472,102 @@ export default function ContactsIndex({
                 <ContactEditModal
                     contact={editingContact}
                     categories={categories}
-                    onClose={() =>
-                        setEditingContact(null)
-                    }
+                    onClose={() => setEditingContact(null)}
                 />
             )}
 
-            {similarityContact &&
-                similarityContact.looks_like_contact && (
-                    <ContactSimilarityModal
-                        contact={similarityContact}
-                        similarContact={
-                            similarityContact.looks_like_contact
-                        }
-                        onClose={() =>
-                            setSimilarityContact(null)
-                        }
-                    />
-                )}
+            {isMergeModalOpen && selectedContacts.length >= 2 && (
+                <MergeSelectedContactsModal
+                    contacts={selectedContacts}
+                    onClose={() => setIsMergeModalOpen(false)}
+                    onMerged={() => {
+                        setIsMergeModalOpen(false);
+                        clearSelection();
+                    }}
+                />
+            )}
         </AppLayout>
     );
 }
 
-function ContactEditModal({
-    contact,
-    categories,
+function MergeSelectedContactsModal({
+    contacts,
     onClose,
+    onMerged,
 }: {
-    contact: ContactItem;
-    categories: CategoryItem[];
+    contacts: ContactItem[];
     onClose: () => void;
+    onMerged: () => void;
 }) {
-    const expenseCategories = useMemo(
+    const recommendedTarget = useMemo(
         () =>
-            categories.filter(
-                (category) =>
-                    category.type === 'expense',
-            ),
-        [categories],
+            [...contacts].sort(
+                (first, second) =>
+                    getContactCompletenessScore(second) -
+                    getContactCompletenessScore(first),
+            )[0],
+        [contacts],
     );
 
-    const incomeCategories = useMemo(
-        () =>
-            categories.filter(
-                (category) =>
-                    category.type === 'income',
-            ),
-        [categories],
+    const [targetContactId, setTargetContactId] = useState<number>(
+        recommendedTarget?.id ?? contacts[0]?.id,
     );
 
-    const [name, setName] = useState(
-        contact.name,
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [error, setError] = useState<string | null>(null);
+
+    const targetContact =
+        contacts.find((contact) => contact.id === targetContactId) ?? contacts[0];
+
+    const sourceContacts = contacts.filter(
+        (contact) => contact.id !== targetContact?.id,
     );
 
-    const [contactType, setContactType] =
-        useState<EditableContactType>(
-            contact.contact_type ?? '',
-        );
+    const hasIncompatibleTypes =
+        new Set(
+            contacts
+                .map((contact) => contact.contact_type)
+                .filter((type): type is Exclude<ContactType, null> => type !== null),
+        ).size > 1;
 
-    const [document, setDocument] = useState(
-        getEditableDocument(
-            contact.document,
-            contact.contact_type,
-        ),
-    );
-
-    const [
-        expenseCategoryId,
-        setExpenseCategoryId,
-    ] = useState(
-        contact.default_expense_category_id?.toString()
-        ?? '',
-    );
-
-    const [
-        incomeCategoryId,
-        setIncomeCategoryId,
-    ] = useState(
-        contact.default_income_category_id?.toString()
-        ?? '',
-    );
-
-    const [isSubmitting, setIsSubmitting] =
-        useState(false);
-
-    const [error, setError] =
-        useState<string | null>(null);
-
-    function handleContactTypeChange(
-        newType: EditableContactType,
-    ) {
-        if (newType !== contactType) {
-            setDocument('');
-        }
-
-        setContactType(newType);
-        setError(null);
-    }
-
-    function handleDocumentChange(value: string) {
-        const maximumLength =
-            contactType === 'company'
-                ? 14
-                : 11;
-
-        const digits = value
-            .replace(/\D/g, '')
-            .slice(0, maximumLength);
-
-        setDocument(digits);
-        setError(null);
-    }
-
-    function handleSubmit(
-        event: FormEvent<HTMLFormElement>,
-    ) {
-        event.preventDefault();
-
-        const normalizedName = name.trim();
-
-        if (!normalizedName) {
-            setError('Informe o nome do contato.');
+    function handleMerge() {
+        if (!targetContact) {
+            setError("Selecione o contato que deve permanecer.");
             return;
         }
 
-        const documentError =
-            validateDocumentOnClient(
-                document,
-                contactType,
-            );
-
-        if (documentError) {
-            setError(documentError);
+        if (hasIncompatibleTypes) {
+            setError("Não é possível mesclar pessoas e empresas na mesma operação.");
             return;
         }
 
         setIsSubmitting(true);
         setError(null);
 
-        router.patch(
-            `/contacts/${contact.id}`,
+        router.post(
+            "/contacts/merge-many",
             {
-                name: normalizedName,
+                contact_ids: contacts.map((contact) => contact.id),
 
-                document:
-                    document || null,
-
-                contact_type:
-                    contactType || null,
-
-                default_expense_category_id:
-                    expenseCategoryId
-                        ? Number(expenseCategoryId)
-                        : null,
-
-                default_income_category_id:
-                    incomeCategoryId
-                        ? Number(incomeCategoryId)
-                        : null,
+                target_contact_id: targetContact.id,
             },
             {
                 preserveScroll: true,
 
                 onSuccess: () => {
-                    onClose();
+                    onMerged();
                 },
 
                 onError: (errors) => {
                     const firstError =
-                        errors.name
-                        || errors.document
-                        || errors.contact_type
-                        || errors.default_expense_category_id
-                        || errors.default_income_category_id
-                        || 'Não foi possível atualizar o contato.';
+                        errors.contact_ids ||
+                        errors.target_contact_id ||
+                        errors.contact_type ||
+                        errors.document ||
+                        errors.aliases ||
+                        errors.contacts ||
+                        "Não foi possível mesclar os contatos.";
 
                     setError(firstError);
                 },
@@ -696,30 +583,351 @@ function ContactEditModal({
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
             onMouseDown={(event) => {
-                if (
-                    event.target === event.currentTarget
-                    && !isSubmitting
-                ) {
+                if (event.target === event.currentTarget && !isSubmitting) {
+                    onClose();
+                }
+            }}
+        >
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border bg-background shadow-xl">
+                <div className="border-b p-5">
+                    <h2 className="text-lg font-semibold">
+                        Mesclar contatos selecionados
+                    </h2>
+
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Escolha o contato principal. Os demais serão removidos, mas seus
+                        nomes, apelidos e transações serão preservados.
+                    </p>
+                </div>
+
+                <div className="space-y-5 p-5">
+                    {hasIncompatibleTypes && (
+                        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            A seleção contém pessoas e empresas. Remova os contatos
+                            incompatíveis antes de continuar.
+                        </div>
+                    )}
+
+                    <fieldset className="space-y-3">
+                        <legend className="text-sm font-medium">
+                            Qual contato deve permanecer?
+                        </legend>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                            {contacts.map((contact) => {
+                                const selected = contact.id === targetContactId;
+
+                                const recommended = contact.id === recommendedTarget?.id;
+
+                                return (
+                                    <label
+                                        key={contact.id}
+                                        className={`cursor-pointer rounded-xl border p-4 transition-colors ${selected
+                                                ? "border-primary bg-primary/5"
+                                                : "hover:bg-muted/40"
+                                            }`}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <input
+                                                type="radio"
+                                                name="target_contact_id"
+                                                value={contact.id}
+                                                checked={selected}
+                                                onChange={() => {
+                                                    setTargetContactId(contact.id);
+                                                    setError(null);
+                                                }}
+                                                className="mt-1"
+                                            />
+
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-medium">{contact.name}</span>
+
+                                                    {recommended && (
+                                                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                                                            Mais completo
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <dl className="mt-3 space-y-1.5 text-xs">
+                                                    <div className="flex justify-between gap-4">
+                                                        <dt className="text-muted-foreground">Tipo</dt>
+                                                        <dd className="font-medium">
+                                                            {formatContactType(contact.contact_type)}
+                                                        </dd>
+                                                    </div>
+
+                                                    <div className="flex justify-between gap-4">
+                                                        <dt className="text-muted-foreground">Documento</dt>
+                                                        <dd className="text-right font-medium">
+                                                            {formatStoredDocument(contact.document)}
+                                                        </dd>
+                                                    </div>
+
+                                                    <div className="flex justify-between gap-4">
+                                                        <dt className="text-muted-foreground">
+                                                            Transações
+                                                        </dt>
+                                                        <dd className="font-medium">
+                                                            {contact.transactions_count}
+                                                        </dd>
+                                                    </div>
+
+                                                    <div className="flex justify-between gap-4">
+                                                        <dt className="text-muted-foreground">Apelidos</dt>
+                                                        <dd className="font-medium">
+                                                            {contact.aliases.length}
+                                                        </dd>
+                                                    </div>
+                                                </dl>
+                                            </div>
+                                        </div>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </fieldset>
+
+                    {targetContact && (
+                        <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+                            <p className="font-medium">Resultado da mesclagem</p>
+
+                            <ul className="mt-2 space-y-1 text-muted-foreground">
+                                <li>
+                                    <strong className="text-foreground">
+                                        {targetContact.name}
+                                    </strong>{" "}
+                                    permanecerá como contato principal.
+                                </li>
+
+                                <li>
+                                    {sourceContacts.length}{" "}
+                                    {sourceContacts.length === 1
+                                        ? "contato será removido"
+                                        : "contatos serão removidos"}
+                                    .
+                                </li>
+
+                                <li>
+                                    Os nomes e apelidos dos contatos removidos serão associados ao
+                                    contato principal.
+                                </li>
+
+                                <li>
+                                    Todas as transações serão transferidas para o contato
+                                    principal.
+                                </li>
+
+                                <li>
+                                    Campos vazios do principal poderão herdar dados dos contatos
+                                    removidos.
+                                </li>
+                            </ul>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 border-t pt-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isSubmitting}
+                            className="h-10 rounded-md border px-4 text-sm font-medium disabled:opacity-50"
+                        >
+                            Cancelar
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleMerge}
+                            disabled={isSubmitting || hasIncompatibleTypes || !targetContact}
+                            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {isSubmitting
+                                ? "Mesclando..."
+                                : `Mesclar e manter “${targetContact?.name ?? ""}”`}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function getContactCompletenessScore(contact: ContactItem): number {
+    let score = contact.name.trim().length;
+
+    if (contact.document) {
+        score += 30;
+    }
+
+    if (contact.contact_type) {
+        score += 20;
+    }
+
+    if (contact.default_expense_category_id) {
+        score += 10;
+    }
+
+    if (contact.default_income_category_id) {
+        score += 10;
+    }
+
+    score += Math.min(contact.aliases.length, 10);
+
+    score += Math.min(contact.transactions_count, 20);
+
+    return score;
+}
+
+function ContactEditModal({
+    contact,
+    categories,
+    onClose,
+}: {
+    contact: ContactItem;
+    categories: CategoryItem[];
+    onClose: () => void;
+}) {
+    const expenseCategories = useMemo(
+        () => categories.filter((category) => category.type === "expense"),
+        [categories],
+    );
+
+    const incomeCategories = useMemo(
+        () => categories.filter((category) => category.type === "income"),
+        [categories],
+    );
+
+    const [name, setName] = useState(contact.name);
+
+    const [contactType, setContactType] = useState<EditableContactType>(
+        contact.contact_type ?? "",
+    );
+
+    const [document, setDocument] = useState(
+        getEditableDocument(contact.document, contact.contact_type),
+    );
+
+    const [expenseCategoryId, setExpenseCategoryId] = useState(
+        contact.default_expense_category_id?.toString() ?? "",
+    );
+
+    const [incomeCategoryId, setIncomeCategoryId] = useState(
+        contact.default_income_category_id?.toString() ?? "",
+    );
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [error, setError] = useState<string | null>(null);
+
+    function handleContactTypeChange(newType: EditableContactType) {
+        if (newType !== contactType) {
+            setDocument("");
+        }
+
+        setContactType(newType);
+        setError(null);
+    }
+
+    function handleDocumentChange(value: string) {
+        const maximumLength = contactType === "company" ? 14 : 11;
+
+        const digits = value.replace(/\D/g, "").slice(0, maximumLength);
+
+        setDocument(digits);
+        setError(null);
+    }
+
+    function handleSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+
+        const normalizedName = name.trim();
+
+        if (!normalizedName) {
+            setError("Informe o nome do contato.");
+            return;
+        }
+
+        const documentError = validateDocumentOnClient(document, contactType);
+
+        if (documentError) {
+            setError(documentError);
+            return;
+        }
+
+        setIsSubmitting(true);
+        setError(null);
+
+        router.patch(
+            `/contacts/${contact.id}`,
+            {
+                name: normalizedName,
+
+                document: document || null,
+
+                contact_type: contactType || null,
+
+                default_expense_category_id: expenseCategoryId
+                    ? Number(expenseCategoryId)
+                    : null,
+
+                default_income_category_id: incomeCategoryId
+                    ? Number(incomeCategoryId)
+                    : null,
+            },
+            {
+                preserveScroll: true,
+
+                onSuccess: () => {
+                    onClose();
+                },
+
+                onError: (errors) => {
+                    const firstError =
+                        errors.name ||
+                        errors.document ||
+                        errors.contact_type ||
+                        errors.default_expense_category_id ||
+                        errors.default_income_category_id ||
+                        "Não foi possível atualizar o contato.";
+
+                    setError(firstError);
+                },
+
+                onFinish: () => {
+                    setIsSubmitting(false);
+                },
+            },
+        );
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !isSubmitting) {
                     onClose();
                 }
             }}
         >
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border bg-background shadow-xl">
                 <div className="border-b p-5">
-                    <h2 className="text-lg font-semibold">
-                        Editar contato
-                    </h2>
+                    <h2 className="text-lg font-semibold">Editar contato</h2>
 
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Atualize os dados e as categorias padrão
-                        desta contraparte.
+                        Atualize os dados e as categorias padrão desta contraparte.
                     </p>
                 </div>
 
-                <form
-                    onSubmit={handleSubmit}
-                    className="space-y-5 p-5"
-                >
+                <form onSubmit={handleSubmit} className="space-y-5 p-5">
                     <div>
                         <label
                             htmlFor="contact_name"
@@ -733,11 +941,7 @@ function ContactEditModal({
                             type="text"
                             value={name}
                             maxLength={255}
-                            onChange={(event) =>
-                                setName(
-                                    event.target.value,
-                                )
-                            }
+                            onChange={(event) => setName(event.target.value)}
                             placeholder="Nome do contato"
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                         />
@@ -756,23 +960,16 @@ function ContactEditModal({
                             value={contactType}
                             onChange={(event) =>
                                 handleContactTypeChange(
-                                    event.target
-                                        .value as EditableContactType,
+                                    event.target.value as EditableContactType,
                                 )
                             }
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         >
-                            <option value="">
-                                Não definido
-                            </option>
+                            <option value="">Não definido</option>
 
-                            <option value="company">
-                                Empresa
-                            </option>
+                            <option value="company">Empresa</option>
 
-                            <option value="individual">
-                                Pessoa
-                            </option>
+                            <option value="individual">Pessoa</option>
                         </select>
                     </div>
 
@@ -788,24 +985,11 @@ function ContactEditModal({
                             id="contact_document"
                             type="text"
                             inputMode="numeric"
-                            value={formatDocumentInput(
-                                document,
-                                contactType,
-                            )}
-                            maxLength={
-                                contactType === 'company'
-                                    ? 18
-                                    : 14
-                            }
+                            value={formatDocumentInput(document, contactType)}
+                            maxLength={contactType === "company" ? 18 : 14}
                             disabled={!contactType}
-                            onChange={(event) =>
-                                handleDocumentChange(
-                                    event.target.value,
-                                )
-                            }
-                            placeholder={getDocumentPlaceholder(
-                                contactType,
-                            )}
+                            onChange={(event) => handleDocumentChange(event.target.value)}
+                            placeholder={getDocumentPlaceholder(contactType)}
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                         />
 
@@ -825,27 +1009,16 @@ function ContactEditModal({
                         <select
                             id="default_expense_category_id"
                             value={expenseCategoryId}
-                            onChange={(event) =>
-                                setExpenseCategoryId(
-                                    event.target.value,
-                                )
-                            }
+                            onChange={(event) => setExpenseCategoryId(event.target.value)}
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         >
-                            <option value="">
-                                Não definida
-                            </option>
+                            <option value="">Não definida</option>
 
-                            {expenseCategories.map(
-                                (category) => (
-                                    <option
-                                        key={category.id}
-                                        value={category.id}
-                                    >
-                                        {category.name}
-                                    </option>
-                                ),
-                            )}
+                            {expenseCategories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                    {category.name}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
@@ -860,27 +1033,16 @@ function ContactEditModal({
                         <select
                             id="default_income_category_id"
                             value={incomeCategoryId}
-                            onChange={(event) =>
-                                setIncomeCategoryId(
-                                    event.target.value,
-                                )
-                            }
+                            onChange={(event) => setIncomeCategoryId(event.target.value)}
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         >
-                            <option value="">
-                                Não definida
-                            </option>
+                            <option value="">Não definida</option>
 
-                            {incomeCategories.map(
-                                (category) => (
-                                    <option
-                                        key={category.id}
-                                        value={category.id}
-                                    >
-                                        {category.name}
-                                    </option>
-                                ),
-                            )}
+                            {incomeCategories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                    {category.name}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
@@ -902,15 +1064,10 @@ function ContactEditModal({
 
                         <button
                             type="submit"
-                            disabled={
-                                isSubmitting
-                                || !name.trim()
-                            }
+                            disabled={isSubmitting || !name.trim()}
                             className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {isSubmitting
-                                ? 'Salvando...'
-                                : 'Salvar alterações'}
+                            {isSubmitting ? "Salvando..." : "Salvar alterações"}
                         </button>
                     </div>
                 </form>
@@ -919,403 +1076,8 @@ function ContactEditModal({
     );
 }
 
-function ContactSimilarityModal({
-    contact,
-    similarContact,
-    onClose,
-}: {
-    contact: ContactItem;
-    similarContact: SimilarContact;
-    onClose: () => void;
-}) {
-    const [direction, setDirection] =
-        useState<MergeDirection>(
-            'current_into_similar',
-        );
-
-    const [isSubmitting, setIsSubmitting] =
-        useState(false);
-
-    const [isIgnoring, setIsIgnoring] =
-        useState(false);
-
-    const [error, setError] =
-        useState<string | null>(null);
-
-    const sourceContact =
-        direction === 'current_into_similar'
-            ? contact
-            : similarContact;
-
-    const targetContact =
-        direction === 'current_into_similar'
-            ? similarContact
-            : contact;
-
-    function handleMerge() {
-        setIsSubmitting(true);
-        setError(null);
-
-        router.post(
-            `/contacts/${contact.id}/merge`,
-            {
-                source_contact_id:
-                    sourceContact.id,
-
-                target_contact_id:
-                    targetContact.id,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-
-                onSuccess: () => {
-                    onClose();
-
-                    router.reload({
-                        only: ['contacts'],
-                        preserveScroll: true,
-                        preserveState: true,
-                    });
-                },
-            },
-        );
-    }
-
-    function handleIgnore() {
-        setIsIgnoring(true);
-        setError(null);
-
-        router.patch(
-            `/contacts/${contact.id}/dismiss-similarity`,
-            {},
-            {
-                preserveScroll: true,
-
-                onSuccess: () => {
-                    onClose();
-                },
-
-                onError: () => {
-                    setError(
-                        'Não foi possível ignorar a sugestão.',
-                    );
-                },
-
-                onFinish: () => {
-                    setIsIgnoring(false);
-                },
-            },
-        );
-    }
-
-    return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onMouseDown={(event) => {
-                if (
-                    event.target === event.currentTarget
-                    && !isSubmitting
-                    && !isIgnoring
-                ) {
-                    onClose();
-                }
-            }}
-        >
-            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border bg-background shadow-xl">
-                <div className="border-b p-5">
-                    <h2 className="text-lg font-semibold">
-                        Possível contato duplicado
-                    </h2>
-
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Compare os dois contatos e escolha qual deve
-                        permanecer como principal.
-                    </p>
-                </div>
-
-                <div className="space-y-5 p-5">
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <ContactComparisonCard
-                            title="Contato atual"
-                            contact={contact}
-                            highlighted={
-                                targetContact.id ===
-                                contact.id
-                            }
-                        />
-
-                        <ContactComparisonCard
-                            title="Contato semelhante"
-                            contact={similarContact}
-                            highlighted={
-                                targetContact.id ===
-                                similarContact.id
-                            }
-                        />
-                    </div>
-
-                    <fieldset className="space-y-3">
-                        <legend className="text-sm font-medium">
-                            Qual contato deve permanecer?
-                        </legend>
-
-                        <MergeDirectionOption
-                            value="current_into_similar"
-                            selectedValue={direction}
-                            onChange={setDirection}
-                            title={`Manter “${similarContact.name}”`}
-                            description={`“${contact.name}” será removido e passará a ser apelido de “${similarContact.name}”.`}
-                        />
-
-                        <MergeDirectionOption
-                            value="similar_into_current"
-                            selectedValue={direction}
-                            onChange={setDirection}
-                            title={`Manter “${contact.name}”`}
-                            description={`“${similarContact.name}” será removido e passará a ser apelido de “${contact.name}”.`}
-                        />
-                    </fieldset>
-
-                    <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-                        <p className="font-medium">
-                            Resultado da mesclagem
-                        </p>
-
-                        <ul className="mt-2 space-y-1 text-muted-foreground">
-                            <li>
-                                Todas as transações de{' '}
-                                <strong className="text-foreground">
-                                    {sourceContact.name}
-                                </strong>{' '}
-                                serão movidas para{' '}
-                                <strong className="text-foreground">
-                                    {targetContact.name}
-                                </strong>
-                                .
-                            </li>
-
-                            <li>
-                                O nome{' '}
-                                <strong className="text-foreground">
-                                    {sourceContact.name}
-                                </strong>{' '}
-                                será salvo como apelido.
-                            </li>
-
-                            <li>
-                                Dados vazios do contato principal poderão
-                                ser preenchidos com os dados do contato
-                                removido.
-                            </li>
-
-                            <li>
-                                Futuras importações com o apelido serão
-                                vinculadas automaticamente ao contato
-                                principal.
-                            </li>
-                        </ul>
-                    </div>
-
-                    {error && (
-                        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-between">
-                        <button
-                            type="button"
-                            disabled={
-                                isSubmitting
-                                || isIgnoring
-                            }
-                            onClick={handleIgnore}
-                            className="h-10 rounded-md border border-amber-300 px-4 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
-                        >
-                            {isIgnoring
-                                ? 'Ignorando...'
-                                : 'Não são duplicados'}
-                        </button>
-
-                        <div className="flex justify-end gap-2">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                disabled={
-                                    isSubmitting
-                                    || isIgnoring
-                                }
-                                className="h-10 rounded-md border px-4 text-sm font-medium disabled:opacity-50"
-                            >
-                                Cancelar
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleMerge}
-                                disabled={
-                                    isSubmitting
-                                    || isIgnoring
-                                }
-                                className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {isSubmitting
-                                    ? 'Mesclando...'
-                                    : `Mesclar e manter “${targetContact.name}”`}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function ContactComparisonCard({
-    title,
-    contact,
-    highlighted,
-}: {
-    title: string;
-    contact: ContactItem | SimilarContact;
-    highlighted: boolean;
-}) {
-    return (
-        <div
-            className={`rounded-xl border p-4 ${highlighted
-                ? 'border-primary bg-primary/5'
-                : ''
-                }`}
-        >
-            <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {title}
-                </p>
-
-                {highlighted && (
-                    <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
-                        Será mantido
-                    </span>
-                )}
-            </div>
-
-            <p className="mt-3 font-semibold">
-                {contact.name}
-            </p>
-
-            <dl className="mt-4 space-y-2 text-sm">
-                <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">
-                        Tipo
-                    </dt>
-
-                    <dd className="text-right font-medium">
-                        {formatContactType(
-                            contact.contact_type,
-                        )}
-                    </dd>
-                </div>
-
-                <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">
-                        Documento
-                    </dt>
-
-                    <dd className="text-right font-medium">
-                        {formatStoredDocument(
-                            contact.document,
-                        )}
-                    </dd>
-                </div>
-
-                <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">
-                        Transações
-                    </dt>
-
-                    <dd className="text-right font-medium">
-                        {contact.transactions_count}
-                    </dd>
-                </div>
-
-                <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">
-                        Apelidos
-                    </dt>
-
-                    <dd className="text-right font-medium">
-                        {contact.aliases.length}
-                    </dd>
-                </div>
-            </dl>
-
-            {contact.aliases.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-1">
-                    {contact.aliases.map((alias) => (
-                        <span
-                            key={alias.id}
-                            className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
-                        >
-                            {alias.name}
-                        </span>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function MergeDirectionOption({
-    value,
-    selectedValue,
-    onChange,
-    title,
-    description,
-}: {
-    value: MergeDirection;
-    selectedValue: MergeDirection;
-    onChange: (
-        value: MergeDirection,
-    ) => void;
-    title: string;
-    description: string;
-}) {
-    return (
-        <label
-            className={`flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors ${selectedValue === value
-                ? 'border-primary bg-primary/5'
-                : 'hover:bg-muted/40'
-                }`}
-        >
-            <input
-                type="radio"
-                name="merge_direction"
-                value={value}
-                checked={selectedValue === value}
-                onChange={() => onChange(value)}
-                className="mt-1"
-            />
-
-            <span>
-                <span className="block text-sm font-medium">
-                    {title}
-                </span>
-
-                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                    {description}
-                </span>
-            </span>
-        </label>
-    );
-}
-
-function ContactTypeBadge({
-    type,
-}: {
-    type: ContactType;
-}) {
-    if (type === 'company') {
+function ContactTypeBadge({ type }: { type: ContactType }) {
+    if (type === "company") {
         return (
             <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-800">
                 Empresa
@@ -1323,7 +1085,7 @@ function ContactTypeBadge({
         );
     }
 
-    if (type === 'individual') {
+    if (type === "individual") {
         return (
             <span className="inline-flex rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-800">
                 Pessoa
@@ -1338,11 +1100,7 @@ function ContactTypeBadge({
     );
 }
 
-function CategoryBadge({
-    category,
-}: {
-    category: CategoryItem;
-}) {
+function CategoryBadge({ category }: { category: CategoryItem }) {
     return (
         <span className="inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium">
             <span
@@ -1357,11 +1115,7 @@ function CategoryBadge({
     );
 }
 
-function Pagination({
-    contacts,
-}: {
-    contacts: PaginatedContacts;
-}) {
+function Pagination({ contacts }: { contacts: PaginatedContacts }) {
     if (contacts.last_page <= 1) {
         return null;
     }
@@ -1369,8 +1123,7 @@ function Pagination({
     return (
         <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between md:px-6">
             <p className="text-sm text-muted-foreground">
-                Exibindo {contacts.from ?? 0} até{' '}
-                {contacts.to ?? 0} de {contacts.total}
+                Exibindo {contacts.from ?? 0} até {contacts.to ?? 0} de {contacts.total}
             </p>
 
             <div className="flex flex-wrap gap-1">
@@ -1390,8 +1143,8 @@ function Pagination({
                             });
                         }}
                         className={`min-w-9 rounded-md border px-3 py-2 text-sm ${link.active
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-background hover:bg-muted'
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-background hover:bg-muted"
                             } disabled:cursor-not-allowed disabled:opacity-40`}
                         dangerouslySetInnerHTML={{
                             __html: link.label,
@@ -1408,24 +1161,18 @@ function getEditableDocument(
     contactType: ContactType,
 ): string {
     if (!document) {
-        return '';
+        return "";
     }
 
-    if (
-        contactType === 'individual'
-        && /^\d{11}$/.test(document)
-    ) {
+    if (contactType === "individual" && /^\d{11}$/.test(document)) {
         return document;
     }
 
-    if (
-        contactType === 'company'
-        && /^\d{14}$/.test(document)
-    ) {
+    if (contactType === "company" && /^\d{14}$/.test(document)) {
         return document;
     }
 
-    return '';
+    return "";
 }
 
 function validateDocumentOnClient(
@@ -1437,161 +1184,124 @@ function validateDocumentOnClient(
     }
 
     if (!contactType) {
-        return 'Selecione o tipo do contato antes de informar o documento.';
+        return "Selecione o tipo do contato antes de informar o documento.";
     }
 
-    if (
-        contactType === 'individual'
-        && document.length !== 11
-    ) {
-        return 'Informe um CPF completo com 11 dígitos.';
+    if (contactType === "individual" && document.length !== 11) {
+        return "Informe um CPF completo com 11 dígitos.";
     }
 
-    if (
-        contactType === 'company'
-        && document.length !== 14
-    ) {
-        return 'Informe um CNPJ completo com 14 dígitos.';
+    if (contactType === "company" && document.length !== 14) {
+        return "Informe um CNPJ completo com 14 dígitos.";
     }
 
     return null;
 }
 
-function getDocumentLabel(
-    contactType: EditableContactType,
-): string {
-    if (contactType === 'company') {
-        return 'CNPJ';
+function getDocumentLabel(contactType: EditableContactType): string {
+    if (contactType === "company") {
+        return "CNPJ";
     }
 
-    if (contactType === 'individual') {
-        return 'CPF';
+    if (contactType === "individual") {
+        return "CPF";
     }
 
-    return 'Documento';
+    return "Documento";
 }
 
-function getDocumentPlaceholder(
-    contactType: EditableContactType,
-): string {
-    if (contactType === 'company') {
-        return '00.000.000/0000-00';
+function getDocumentPlaceholder(contactType: EditableContactType): string {
+    if (contactType === "company") {
+        return "00.000.000/0000-00";
     }
 
-    if (contactType === 'individual') {
-        return '000.000.000-00';
+    if (contactType === "individual") {
+        return "000.000.000-00";
     }
 
-    return 'Selecione primeiro o tipo';
+    return "Selecione primeiro o tipo";
 }
 
-function getDocumentHelp(
-    contactType: EditableContactType,
-): string {
-    if (contactType === 'company') {
-        return 'Informe um CNPJ completo e válido ou deixe vazio.';
+function getDocumentHelp(contactType: EditableContactType): string {
+    if (contactType === "company") {
+        return "Informe um CNPJ completo e válido ou deixe vazio.";
     }
 
-    if (contactType === 'individual') {
-        return 'Informe um CPF completo e válido ou deixe vazio.';
+    if (contactType === "individual") {
+        return "Informe um CPF completo e válido ou deixe vazio.";
     }
 
-    return 'Selecione Empresa ou Pessoa antes de informar o documento.';
+    return "Selecione Empresa ou Pessoa antes de informar o documento.";
 }
 
 function formatDocumentInput(
     document: string,
     contactType: EditableContactType,
 ): string {
-    const digits = document.replace(/\D/g, '');
+    const digits = document.replace(/\D/g, "");
 
-    if (contactType === 'individual') {
+    if (contactType === "individual") {
         return digits
-            .replace(
-                /^(\d{3})(\d)/,
-                '$1.$2',
-            )
-            .replace(
-                /^(\d{3})\.(\d{3})(\d)/,
-                '$1.$2.$3',
-            )
-            .replace(
-                /^(\d{3})\.(\d{3})\.(\d{3})(\d)/,
-                '$1.$2.$3-$4',
-            )
+            .replace(/^(\d{3})(\d)/, "$1.$2")
+            .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+            .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4")
             .slice(0, 14);
     }
 
-    if (contactType === 'company') {
+    if (contactType === "company") {
         return digits
-            .replace(
-                /^(\d{2})(\d)/,
-                '$1.$2',
-            )
-            .replace(
-                /^(\d{2})\.(\d{3})(\d)/,
-                '$1.$2.$3',
-            )
-            .replace(
-                /^(\d{2})\.(\d{3})\.(\d{3})(\d)/,
-                '$1.$2.$3/$4',
-            )
-            .replace(
-                /(\d{4})(\d{1,2})$/,
-                '$1-$2',
-            )
+            .replace(/^(\d{2})(\d)/, "$1.$2")
+            .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+            .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3/$4")
+            .replace(/(\d{4})(\d{1,2})$/, "$1-$2")
             .slice(0, 18);
     }
 
     return digits;
 }
 
-function formatStoredDocument(
-    document: string | null,
-): string {
+function formatStoredDocument(document: string | null): string {
     if (!document) {
-        return 'Não informado';
+        return "Não informado";
     }
 
     if (/^\d{11}$/.test(document)) {
         return [
             document.slice(0, 3),
-            '.',
+            ".",
             document.slice(3, 6),
-            '.',
+            ".",
             document.slice(6, 9),
-            '-',
+            "-",
             document.slice(9, 11),
-        ].join('');
+        ].join("");
     }
 
     if (/^\d{14}$/.test(document)) {
         return [
             document.slice(0, 2),
-            '.',
+            ".",
             document.slice(2, 5),
-            '.',
+            ".",
             document.slice(5, 8),
-            '/',
+            "/",
             document.slice(8, 12),
-            '-',
+            "-",
             document.slice(12, 14),
-        ].join('');
+        ].join("");
     }
 
-    return 'Incompleto na importação';
+    return "Incompleto na importação";
 }
 
-function formatContactType(
-    type: ContactType,
-): string {
-    if (type === 'company') {
-        return 'Empresa';
+function formatContactType(type: ContactType): string {
+    if (type === "company") {
+        return "Empresa";
     }
 
-    if (type === 'individual') {
-        return 'Pessoa';
+    if (type === "individual") {
+        return "Pessoa";
     }
 
-    return 'Não definido';
+    return "Não definido";
 }
