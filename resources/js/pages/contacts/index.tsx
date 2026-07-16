@@ -1,0 +1,1597 @@
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, usePage } from '@inertiajs/react';
+import {
+    FormEvent,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react';
+
+type ContactType =
+    | 'company'
+    | 'individual'
+    | null;
+
+type EditableContactType =
+    | 'company'
+    | 'individual'
+    | '';
+
+type CategoryType =
+    | 'expense'
+    | 'income';
+
+type CategoryItem = {
+    id: number;
+    name: string;
+    type: CategoryType;
+    color: string;
+};
+
+type ContactAlias = {
+    id: number;
+    name: string;
+    normalized_name: string;
+};
+
+type SimilarContact = {
+    id: number;
+    name: string;
+    document: string | null;
+    contact_type: ContactType;
+
+    default_expense_category_id: number | null;
+    default_income_category_id: number | null;
+
+    default_expense_category: CategoryItem | null;
+    default_income_category: CategoryItem | null;
+
+    aliases: ContactAlias[];
+
+    transactions_count: number;
+};
+
+type ContactItem = {
+    id: number;
+    name: string;
+    document: string | null;
+    contact_type: ContactType;
+
+    default_expense_category_id: number | null;
+    default_income_category_id: number | null;
+
+    default_expense_category: CategoryItem | null;
+    default_income_category: CategoryItem | null;
+
+    aliases: ContactAlias[];
+
+    looks_like_contact: SimilarContact | null;
+
+    transactions_count: number;
+};
+
+type PaginationLink = {
+    url: string | null;
+    label: string;
+    active: boolean;
+};
+
+type PaginatedContacts = {
+    data: ContactItem[];
+
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+
+    from: number | null;
+    to: number | null;
+
+    links: PaginationLink[];
+};
+
+type Filters = {
+    search: string;
+    contact_type: string;
+};
+
+type FlashMessages = {
+    success?: string;
+    error?: string;
+};
+
+type PageProps = {
+    flash?: FlashMessages;
+};
+
+type Props = {
+    contacts: PaginatedContacts;
+    categories: CategoryItem[];
+    filters: Filters;
+};
+
+type MergeDirection =
+    | 'current_into_similar'
+    | 'similar_into_current';
+
+const breadcrumbs = [
+    {
+        title: 'Contatos',
+        href: '/contacts',
+    },
+];
+
+export default function ContactsIndex({
+    contacts,
+    categories,
+    filters,
+}: Props) {
+    const page = usePage<PageProps>();
+
+    const successMessage =
+        page.props.flash?.success ?? null;
+
+    const errorMessage =
+        page.props.flash?.error ?? null;
+
+    const [search, setSearch] = useState(
+        filters.search,
+    );
+
+    const [contactType, setContactType] = useState(
+        filters.contact_type,
+    );
+
+    const [
+        editingContact,
+        setEditingContact,
+    ] = useState<ContactItem | null>(null);
+
+    const [
+        similarityContact,
+        setSimilarityContact,
+    ] = useState<ContactItem | null>(null);
+
+    useEffect(() => {
+        setSearch(filters.search);
+        setContactType(filters.contact_type);
+    }, [filters]);
+
+    function handleSubmit(
+        event: FormEvent<HTMLFormElement>,
+    ) {
+        event.preventDefault();
+
+        router.get(
+            '/contacts',
+            {
+                search: search || undefined,
+
+                contact_type:
+                    contactType || undefined,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    }
+
+    function handleClearFilters() {
+        setSearch('');
+        setContactType('');
+
+        router.get(
+            '/contacts',
+            {},
+            {
+                preserveState: false,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    }
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Contatos" />
+
+            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+                <header>
+                    <h1 className="text-2xl font-semibold">
+                        Contatos
+                    </h1>
+
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Gerencie as contrapartes, apelidos e possíveis
+                        duplicidades encontradas nos extratos.
+                    </p>
+                </header>
+
+                {successMessage && (
+                    <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                        {successMessage}
+                    </div>
+                )}
+
+                {errorMessage && (
+                    <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {errorMessage}
+                    </div>
+                )}
+
+                <section className="rounded-xl border bg-card p-4 shadow-sm md:p-6">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_auto]"
+                    >
+                        <div>
+                            <label
+                                htmlFor="search"
+                                className="mb-1.5 block text-sm font-medium"
+                            >
+                                Buscar
+                            </label>
+
+                            <input
+                                id="search"
+                                type="text"
+                                value={search}
+                                onChange={(event) =>
+                                    setSearch(
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="Nome, documento ou apelido"
+                                className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                            />
+                        </div>
+
+                        <div>
+                            <label
+                                htmlFor="contact_type"
+                                className="mb-1.5 block text-sm font-medium"
+                            >
+                                Tipo
+                            </label>
+
+                            <select
+                                id="contact_type"
+                                value={contactType}
+                                onChange={(event) =>
+                                    setContactType(
+                                        event.target.value,
+                                    )
+                                }
+                                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                            >
+                                <option value="">
+                                    Todos
+                                </option>
+
+                                <option value="company">
+                                    Empresas
+                                </option>
+
+                                <option value="individual">
+                                    Pessoas
+                                </option>
+
+                                <option value="unknown">
+                                    Não definido
+                                </option>
+                            </select>
+                        </div>
+
+                        <div className="flex items-end gap-2">
+                            <button
+                                type="submit"
+                                className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+                            >
+                                Filtrar
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleClearFilters}
+                                className="h-10 rounded-md border px-4 text-sm font-medium"
+                            >
+                                Limpar
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                    <div className="border-b p-4 md:p-6">
+                        <h2 className="text-lg font-semibold">
+                            Contrapartes
+                        </h2>
+
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {contacts.total === 0
+                                ? 'Nenhum contato encontrado.'
+                                : `${contacts.total} contatos encontrados.`}
+                        </p>
+                    </div>
+
+                    {contacts.data.length === 0 ? (
+                        <div className="p-8 text-center text-sm text-muted-foreground">
+                            Nenhum contato corresponde aos filtros
+                            selecionados.
+                        </div>
+                    ) : (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[1150px] text-left text-sm">
+                                    <thead className="border-b bg-muted/50">
+                                        <tr>
+                                            <th className="px-4 py-3 font-medium md:px-6">
+                                                Contato
+                                            </th>
+
+                                            <th className="px-4 py-3 font-medium md:px-6">
+                                                Tipo
+                                            </th>
+
+                                            <th className="px-4 py-3 font-medium md:px-6">
+                                                Categoria de despesa
+                                            </th>
+
+                                            <th className="px-4 py-3 font-medium md:px-6">
+                                                Categoria de receita
+                                            </th>
+
+                                            <th className="px-4 py-3 text-center font-medium md:px-6">
+                                                Transações
+                                            </th>
+
+                                            <th className="px-4 py-3 text-right font-medium md:px-6">
+                                                Ações
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        {contacts.data.map(
+                                            (contact) => (
+                                                <tr
+                                                    key={contact.id}
+                                                    className="border-b last:border-b-0 hover:bg-muted/30"
+                                                >
+                                                    <td className="px-4 py-4 md:px-6">
+                                                        <div className="flex items-start gap-2">
+                                                            <div className="min-w-0">
+                                                                <div className="font-medium">
+                                                                    {
+                                                                        contact.name
+                                                                    }
+                                                                </div>
+
+                                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                                    {formatStoredDocument(
+                                                                        contact.document,
+                                                                    )}
+                                                                </div>
+
+                                                                {contact.aliases.length >
+                                                                    0 && (
+                                                                        <div className="mt-2 flex flex-wrap gap-1">
+                                                                            {contact.aliases
+                                                                                .slice(
+                                                                                    0,
+                                                                                    3,
+                                                                                )
+                                                                                .map(
+                                                                                    (
+                                                                                        alias,
+                                                                                    ) => (
+                                                                                        <span
+                                                                                            key={
+                                                                                                alias.id
+                                                                                            }
+                                                                                            className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
+                                                                                        >
+                                                                                            {
+                                                                                                alias.name
+                                                                                            }
+                                                                                        </span>
+                                                                                    ),
+                                                                                )}
+
+                                                                            {contact
+                                                                                .aliases
+                                                                                .length >
+                                                                                3 && (
+                                                                                    <span className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                                                        +
+                                                                                        {contact
+                                                                                            .aliases
+                                                                                            .length -
+                                                                                            3}
+                                                                                    </span>
+                                                                                )}
+                                                                        </div>
+                                                                    )}
+                                                            </div>
+
+                                                            {contact.looks_like_contact && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setSimilarityContact(
+                                                                            contact,
+                                                                        )
+                                                                    }
+                                                                    title="Possível contato duplicado"
+                                                                    className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 text-xs font-bold text-amber-700 hover:bg-amber-100"
+                                                                >
+                                                                    !
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="px-4 py-4 md:px-6">
+                                                        <ContactTypeBadge
+                                                            type={
+                                                                contact.contact_type
+                                                            }
+                                                        />
+                                                    </td>
+
+                                                    <td className="px-4 py-4 md:px-6">
+                                                        {contact.default_expense_category ? (
+                                                            <CategoryBadge
+                                                                category={
+                                                                    contact.default_expense_category
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            <span className="text-muted-foreground">
+                                                                Não definida
+                                                            </span>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-4 py-4 md:px-6">
+                                                        {contact.default_income_category ? (
+                                                            <CategoryBadge
+                                                                category={
+                                                                    contact.default_income_category
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            <span className="text-muted-foreground">
+                                                                Não definida
+                                                            </span>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-4 py-4 text-center md:px-6">
+                                                        {
+                                                            contact.transactions_count
+                                                        }
+                                                    </td>
+
+                                                    <td className="px-4 py-4 text-right md:px-6">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setEditingContact(
+                                                                    contact,
+                                                                )
+                                                            }
+                                                            className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+                                                        >
+                                                            Editar
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ),
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <Pagination
+                                contacts={contacts}
+                            />
+                        </>
+                    )}
+                </section>
+            </div>
+
+            {editingContact && (
+                <ContactEditModal
+                    contact={editingContact}
+                    categories={categories}
+                    onClose={() =>
+                        setEditingContact(null)
+                    }
+                />
+            )}
+
+            {similarityContact &&
+                similarityContact.looks_like_contact && (
+                    <ContactSimilarityModal
+                        contact={similarityContact}
+                        similarContact={
+                            similarityContact.looks_like_contact
+                        }
+                        onClose={() =>
+                            setSimilarityContact(null)
+                        }
+                    />
+                )}
+        </AppLayout>
+    );
+}
+
+function ContactEditModal({
+    contact,
+    categories,
+    onClose,
+}: {
+    contact: ContactItem;
+    categories: CategoryItem[];
+    onClose: () => void;
+}) {
+    const expenseCategories = useMemo(
+        () =>
+            categories.filter(
+                (category) =>
+                    category.type === 'expense',
+            ),
+        [categories],
+    );
+
+    const incomeCategories = useMemo(
+        () =>
+            categories.filter(
+                (category) =>
+                    category.type === 'income',
+            ),
+        [categories],
+    );
+
+    const [name, setName] = useState(
+        contact.name,
+    );
+
+    const [contactType, setContactType] =
+        useState<EditableContactType>(
+            contact.contact_type ?? '',
+        );
+
+    const [document, setDocument] = useState(
+        getEditableDocument(
+            contact.document,
+            contact.contact_type,
+        ),
+    );
+
+    const [
+        expenseCategoryId,
+        setExpenseCategoryId,
+    ] = useState(
+        contact.default_expense_category_id?.toString()
+        ?? '',
+    );
+
+    const [
+        incomeCategoryId,
+        setIncomeCategoryId,
+    ] = useState(
+        contact.default_income_category_id?.toString()
+        ?? '',
+    );
+
+    const [isSubmitting, setIsSubmitting] =
+        useState(false);
+
+    const [error, setError] =
+        useState<string | null>(null);
+
+    function handleContactTypeChange(
+        newType: EditableContactType,
+    ) {
+        if (newType !== contactType) {
+            setDocument('');
+        }
+
+        setContactType(newType);
+        setError(null);
+    }
+
+    function handleDocumentChange(value: string) {
+        const maximumLength =
+            contactType === 'company'
+                ? 14
+                : 11;
+
+        const digits = value
+            .replace(/\D/g, '')
+            .slice(0, maximumLength);
+
+        setDocument(digits);
+        setError(null);
+    }
+
+    function handleSubmit(
+        event: FormEvent<HTMLFormElement>,
+    ) {
+        event.preventDefault();
+
+        const normalizedName = name.trim();
+
+        if (!normalizedName) {
+            setError('Informe o nome do contato.');
+            return;
+        }
+
+        const documentError =
+            validateDocumentOnClient(
+                document,
+                contactType,
+            );
+
+        if (documentError) {
+            setError(documentError);
+            return;
+        }
+
+        setIsSubmitting(true);
+        setError(null);
+
+        router.patch(
+            `/contacts/${contact.id}`,
+            {
+                name: normalizedName,
+
+                document:
+                    document || null,
+
+                contact_type:
+                    contactType || null,
+
+                default_expense_category_id:
+                    expenseCategoryId
+                        ? Number(expenseCategoryId)
+                        : null,
+
+                default_income_category_id:
+                    incomeCategoryId
+                        ? Number(incomeCategoryId)
+                        : null,
+            },
+            {
+                preserveScroll: true,
+
+                onSuccess: () => {
+                    onClose();
+                },
+
+                onError: (errors) => {
+                    const firstError =
+                        errors.name
+                        || errors.document
+                        || errors.contact_type
+                        || errors.default_expense_category_id
+                        || errors.default_income_category_id
+                        || 'Não foi possível atualizar o contato.';
+
+                    setError(firstError);
+                },
+
+                onFinish: () => {
+                    setIsSubmitting(false);
+                },
+            },
+        );
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onMouseDown={(event) => {
+                if (
+                    event.target === event.currentTarget
+                    && !isSubmitting
+                ) {
+                    onClose();
+                }
+            }}
+        >
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border bg-background shadow-xl">
+                <div className="border-b p-5">
+                    <h2 className="text-lg font-semibold">
+                        Editar contato
+                    </h2>
+
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Atualize os dados e as categorias padrão
+                        desta contraparte.
+                    </p>
+                </div>
+
+                <form
+                    onSubmit={handleSubmit}
+                    className="space-y-5 p-5"
+                >
+                    <div>
+                        <label
+                            htmlFor="contact_name"
+                            className="mb-1.5 block text-sm font-medium"
+                        >
+                            Nome
+                        </label>
+
+                        <input
+                            id="contact_name"
+                            type="text"
+                            value={name}
+                            maxLength={255}
+                            onChange={(event) =>
+                                setName(
+                                    event.target.value,
+                                )
+                            }
+                            placeholder="Nome do contato"
+                            className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                        />
+                    </div>
+
+                    <div>
+                        <label
+                            htmlFor="contact_type_edit"
+                            className="mb-1.5 block text-sm font-medium"
+                        >
+                            Tipo do contato
+                        </label>
+
+                        <select
+                            id="contact_type_edit"
+                            value={contactType}
+                            onChange={(event) =>
+                                handleContactTypeChange(
+                                    event.target
+                                        .value as EditableContactType,
+                                )
+                            }
+                            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                            <option value="">
+                                Não definido
+                            </option>
+
+                            <option value="company">
+                                Empresa
+                            </option>
+
+                            <option value="individual">
+                                Pessoa
+                            </option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label
+                            htmlFor="contact_document"
+                            className="mb-1.5 block text-sm font-medium"
+                        >
+                            {getDocumentLabel(contactType)}
+                        </label>
+
+                        <input
+                            id="contact_document"
+                            type="text"
+                            inputMode="numeric"
+                            value={formatDocumentInput(
+                                document,
+                                contactType,
+                            )}
+                            maxLength={
+                                contactType === 'company'
+                                    ? 18
+                                    : 14
+                            }
+                            disabled={!contactType}
+                            onChange={(event) =>
+                                handleDocumentChange(
+                                    event.target.value,
+                                )
+                            }
+                            placeholder={getDocumentPlaceholder(
+                                contactType,
+                            )}
+                            className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {getDocumentHelp(contactType)}
+                        </p>
+                    </div>
+
+                    <div>
+                        <label
+                            htmlFor="default_expense_category_id"
+                            className="mb-1.5 block text-sm font-medium"
+                        >
+                            Categoria padrão de despesa
+                        </label>
+
+                        <select
+                            id="default_expense_category_id"
+                            value={expenseCategoryId}
+                            onChange={(event) =>
+                                setExpenseCategoryId(
+                                    event.target.value,
+                                )
+                            }
+                            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                            <option value="">
+                                Não definida
+                            </option>
+
+                            {expenseCategories.map(
+                                (category) => (
+                                    <option
+                                        key={category.id}
+                                        value={category.id}
+                                    >
+                                        {category.name}
+                                    </option>
+                                ),
+                            )}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label
+                            htmlFor="default_income_category_id"
+                            className="mb-1.5 block text-sm font-medium"
+                        >
+                            Categoria padrão de receita
+                        </label>
+
+                        <select
+                            id="default_income_category_id"
+                            value={incomeCategoryId}
+                            onChange={(event) =>
+                                setIncomeCategoryId(
+                                    event.target.value,
+                                )
+                            }
+                            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                            <option value="">
+                                Não definida
+                            </option>
+
+                            {incomeCategories.map(
+                                (category) => (
+                                    <option
+                                        key={category.id}
+                                        value={category.id}
+                                    >
+                                        {category.name}
+                                    </option>
+                                ),
+                            )}
+                        </select>
+                    </div>
+
+                    {error && (
+                        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 border-t pt-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isSubmitting}
+                            className="h-10 rounded-md border px-4 text-sm font-medium disabled:opacity-50"
+                        >
+                            Cancelar
+                        </button>
+
+                        <button
+                            type="submit"
+                            disabled={
+                                isSubmitting
+                                || !name.trim()
+                            }
+                            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {isSubmitting
+                                ? 'Salvando...'
+                                : 'Salvar alterações'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function ContactSimilarityModal({
+    contact,
+    similarContact,
+    onClose,
+}: {
+    contact: ContactItem;
+    similarContact: SimilarContact;
+    onClose: () => void;
+}) {
+    const [direction, setDirection] =
+        useState<MergeDirection>(
+            'current_into_similar',
+        );
+
+    const [isSubmitting, setIsSubmitting] =
+        useState(false);
+
+    const [isIgnoring, setIsIgnoring] =
+        useState(false);
+
+    const [error, setError] =
+        useState<string | null>(null);
+
+    const sourceContact =
+        direction === 'current_into_similar'
+            ? contact
+            : similarContact;
+
+    const targetContact =
+        direction === 'current_into_similar'
+            ? similarContact
+            : contact;
+
+    function handleMerge() {
+        setIsSubmitting(true);
+        setError(null);
+
+        router.post(
+            `/contacts/${contact.id}/merge`,
+            {
+                source_contact_id:
+                    sourceContact.id,
+
+                target_contact_id:
+                    targetContact.id,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+
+                onSuccess: () => {
+                    onClose();
+
+                    router.reload({
+                        only: ['contacts'],
+                        preserveScroll: true,
+                        preserveState: true,
+                    });
+                },
+            },
+        );
+    }
+
+    function handleIgnore() {
+        setIsIgnoring(true);
+        setError(null);
+
+        router.patch(
+            `/contacts/${contact.id}/dismiss-similarity`,
+            {},
+            {
+                preserveScroll: true,
+
+                onSuccess: () => {
+                    onClose();
+                },
+
+                onError: () => {
+                    setError(
+                        'Não foi possível ignorar a sugestão.',
+                    );
+                },
+
+                onFinish: () => {
+                    setIsIgnoring(false);
+                },
+            },
+        );
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onMouseDown={(event) => {
+                if (
+                    event.target === event.currentTarget
+                    && !isSubmitting
+                    && !isIgnoring
+                ) {
+                    onClose();
+                }
+            }}
+        >
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border bg-background shadow-xl">
+                <div className="border-b p-5">
+                    <h2 className="text-lg font-semibold">
+                        Possível contato duplicado
+                    </h2>
+
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Compare os dois contatos e escolha qual deve
+                        permanecer como principal.
+                    </p>
+                </div>
+
+                <div className="space-y-5 p-5">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <ContactComparisonCard
+                            title="Contato atual"
+                            contact={contact}
+                            highlighted={
+                                targetContact.id ===
+                                contact.id
+                            }
+                        />
+
+                        <ContactComparisonCard
+                            title="Contato semelhante"
+                            contact={similarContact}
+                            highlighted={
+                                targetContact.id ===
+                                similarContact.id
+                            }
+                        />
+                    </div>
+
+                    <fieldset className="space-y-3">
+                        <legend className="text-sm font-medium">
+                            Qual contato deve permanecer?
+                        </legend>
+
+                        <MergeDirectionOption
+                            value="current_into_similar"
+                            selectedValue={direction}
+                            onChange={setDirection}
+                            title={`Manter “${similarContact.name}”`}
+                            description={`“${contact.name}” será removido e passará a ser apelido de “${similarContact.name}”.`}
+                        />
+
+                        <MergeDirectionOption
+                            value="similar_into_current"
+                            selectedValue={direction}
+                            onChange={setDirection}
+                            title={`Manter “${contact.name}”`}
+                            description={`“${similarContact.name}” será removido e passará a ser apelido de “${contact.name}”.`}
+                        />
+                    </fieldset>
+
+                    <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+                        <p className="font-medium">
+                            Resultado da mesclagem
+                        </p>
+
+                        <ul className="mt-2 space-y-1 text-muted-foreground">
+                            <li>
+                                Todas as transações de{' '}
+                                <strong className="text-foreground">
+                                    {sourceContact.name}
+                                </strong>{' '}
+                                serão movidas para{' '}
+                                <strong className="text-foreground">
+                                    {targetContact.name}
+                                </strong>
+                                .
+                            </li>
+
+                            <li>
+                                O nome{' '}
+                                <strong className="text-foreground">
+                                    {sourceContact.name}
+                                </strong>{' '}
+                                será salvo como apelido.
+                            </li>
+
+                            <li>
+                                Dados vazios do contato principal poderão
+                                ser preenchidos com os dados do contato
+                                removido.
+                            </li>
+
+                            <li>
+                                Futuras importações com o apelido serão
+                                vinculadas automaticamente ao contato
+                                principal.
+                            </li>
+                        </ul>
+                    </div>
+
+                    {error && (
+                        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-between">
+                        <button
+                            type="button"
+                            disabled={
+                                isSubmitting
+                                || isIgnoring
+                            }
+                            onClick={handleIgnore}
+                            className="h-10 rounded-md border border-amber-300 px-4 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                        >
+                            {isIgnoring
+                                ? 'Ignorando...'
+                                : 'Não são duplicados'}
+                        </button>
+
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                disabled={
+                                    isSubmitting
+                                    || isIgnoring
+                                }
+                                className="h-10 rounded-md border px-4 text-sm font-medium disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleMerge}
+                                disabled={
+                                    isSubmitting
+                                    || isIgnoring
+                                }
+                                className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {isSubmitting
+                                    ? 'Mesclando...'
+                                    : `Mesclar e manter “${targetContact.name}”`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ContactComparisonCard({
+    title,
+    contact,
+    highlighted,
+}: {
+    title: string;
+    contact: ContactItem | SimilarContact;
+    highlighted: boolean;
+}) {
+    return (
+        <div
+            className={`rounded-xl border p-4 ${highlighted
+                ? 'border-primary bg-primary/5'
+                : ''
+                }`}
+        >
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {title}
+                </p>
+
+                {highlighted && (
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
+                        Será mantido
+                    </span>
+                )}
+            </div>
+
+            <p className="mt-3 font-semibold">
+                {contact.name}
+            </p>
+
+            <dl className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">
+                        Tipo
+                    </dt>
+
+                    <dd className="text-right font-medium">
+                        {formatContactType(
+                            contact.contact_type,
+                        )}
+                    </dd>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">
+                        Documento
+                    </dt>
+
+                    <dd className="text-right font-medium">
+                        {formatStoredDocument(
+                            contact.document,
+                        )}
+                    </dd>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">
+                        Transações
+                    </dt>
+
+                    <dd className="text-right font-medium">
+                        {contact.transactions_count}
+                    </dd>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">
+                        Apelidos
+                    </dt>
+
+                    <dd className="text-right font-medium">
+                        {contact.aliases.length}
+                    </dd>
+                </div>
+            </dl>
+
+            {contact.aliases.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-1">
+                    {contact.aliases.map((alias) => (
+                        <span
+                            key={alias.id}
+                            className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
+                        >
+                            {alias.name}
+                        </span>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function MergeDirectionOption({
+    value,
+    selectedValue,
+    onChange,
+    title,
+    description,
+}: {
+    value: MergeDirection;
+    selectedValue: MergeDirection;
+    onChange: (
+        value: MergeDirection,
+    ) => void;
+    title: string;
+    description: string;
+}) {
+    return (
+        <label
+            className={`flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors ${selectedValue === value
+                ? 'border-primary bg-primary/5'
+                : 'hover:bg-muted/40'
+                }`}
+        >
+            <input
+                type="radio"
+                name="merge_direction"
+                value={value}
+                checked={selectedValue === value}
+                onChange={() => onChange(value)}
+                className="mt-1"
+            />
+
+            <span>
+                <span className="block text-sm font-medium">
+                    {title}
+                </span>
+
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                    {description}
+                </span>
+            </span>
+        </label>
+    );
+}
+
+function ContactTypeBadge({
+    type,
+}: {
+    type: ContactType;
+}) {
+    if (type === 'company') {
+        return (
+            <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-800">
+                Empresa
+            </span>
+        );
+    }
+
+    if (type === 'individual') {
+        return (
+            <span className="inline-flex rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-800">
+                Pessoa
+            </span>
+        );
+    }
+
+    return (
+        <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+            Não definido
+        </span>
+    );
+}
+
+function CategoryBadge({
+    category,
+}: {
+    category: CategoryItem;
+}) {
+    return (
+        <span className="inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium">
+            <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                    backgroundColor: category.color,
+                }}
+            />
+
+            {category.name}
+        </span>
+    );
+}
+
+function Pagination({
+    contacts,
+}: {
+    contacts: PaginatedContacts;
+}) {
+    if (contacts.last_page <= 1) {
+        return null;
+    }
+
+    return (
+        <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between md:px-6">
+            <p className="text-sm text-muted-foreground">
+                Exibindo {contacts.from ?? 0} até{' '}
+                {contacts.to ?? 0} de {contacts.total}
+            </p>
+
+            <div className="flex flex-wrap gap-1">
+                {contacts.links.map((link, index) => (
+                    <button
+                        key={`${link.label}-${index}`}
+                        type="button"
+                        disabled={!link.url}
+                        onClick={() => {
+                            if (!link.url) {
+                                return;
+                            }
+
+                            router.visit(link.url, {
+                                preserveState: true,
+                                preserveScroll: true,
+                            });
+                        }}
+                        className={`min-w-9 rounded-md border px-3 py-2 text-sm ${link.active
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-background hover:bg-muted'
+                            } disabled:cursor-not-allowed disabled:opacity-40`}
+                        dangerouslySetInnerHTML={{
+                            __html: link.label,
+                        }}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function getEditableDocument(
+    document: string | null,
+    contactType: ContactType,
+): string {
+    if (!document) {
+        return '';
+    }
+
+    if (
+        contactType === 'individual'
+        && /^\d{11}$/.test(document)
+    ) {
+        return document;
+    }
+
+    if (
+        contactType === 'company'
+        && /^\d{14}$/.test(document)
+    ) {
+        return document;
+    }
+
+    return '';
+}
+
+function validateDocumentOnClient(
+    document: string,
+    contactType: EditableContactType,
+): string | null {
+    if (!document) {
+        return null;
+    }
+
+    if (!contactType) {
+        return 'Selecione o tipo do contato antes de informar o documento.';
+    }
+
+    if (
+        contactType === 'individual'
+        && document.length !== 11
+    ) {
+        return 'Informe um CPF completo com 11 dígitos.';
+    }
+
+    if (
+        contactType === 'company'
+        && document.length !== 14
+    ) {
+        return 'Informe um CNPJ completo com 14 dígitos.';
+    }
+
+    return null;
+}
+
+function getDocumentLabel(
+    contactType: EditableContactType,
+): string {
+    if (contactType === 'company') {
+        return 'CNPJ';
+    }
+
+    if (contactType === 'individual') {
+        return 'CPF';
+    }
+
+    return 'Documento';
+}
+
+function getDocumentPlaceholder(
+    contactType: EditableContactType,
+): string {
+    if (contactType === 'company') {
+        return '00.000.000/0000-00';
+    }
+
+    if (contactType === 'individual') {
+        return '000.000.000-00';
+    }
+
+    return 'Selecione primeiro o tipo';
+}
+
+function getDocumentHelp(
+    contactType: EditableContactType,
+): string {
+    if (contactType === 'company') {
+        return 'Informe um CNPJ completo e válido ou deixe vazio.';
+    }
+
+    if (contactType === 'individual') {
+        return 'Informe um CPF completo e válido ou deixe vazio.';
+    }
+
+    return 'Selecione Empresa ou Pessoa antes de informar o documento.';
+}
+
+function formatDocumentInput(
+    document: string,
+    contactType: EditableContactType,
+): string {
+    const digits = document.replace(/\D/g, '');
+
+    if (contactType === 'individual') {
+        return digits
+            .replace(
+                /^(\d{3})(\d)/,
+                '$1.$2',
+            )
+            .replace(
+                /^(\d{3})\.(\d{3})(\d)/,
+                '$1.$2.$3',
+            )
+            .replace(
+                /^(\d{3})\.(\d{3})\.(\d{3})(\d)/,
+                '$1.$2.$3-$4',
+            )
+            .slice(0, 14);
+    }
+
+    if (contactType === 'company') {
+        return digits
+            .replace(
+                /^(\d{2})(\d)/,
+                '$1.$2',
+            )
+            .replace(
+                /^(\d{2})\.(\d{3})(\d)/,
+                '$1.$2.$3',
+            )
+            .replace(
+                /^(\d{2})\.(\d{3})\.(\d{3})(\d)/,
+                '$1.$2.$3/$4',
+            )
+            .replace(
+                /(\d{4})(\d{1,2})$/,
+                '$1-$2',
+            )
+            .slice(0, 18);
+    }
+
+    return digits;
+}
+
+function formatStoredDocument(
+    document: string | null,
+): string {
+    if (!document) {
+        return 'Não informado';
+    }
+
+    if (/^\d{11}$/.test(document)) {
+        return [
+            document.slice(0, 3),
+            '.',
+            document.slice(3, 6),
+            '.',
+            document.slice(6, 9),
+            '-',
+            document.slice(9, 11),
+        ].join('');
+    }
+
+    if (/^\d{14}$/.test(document)) {
+        return [
+            document.slice(0, 2),
+            '.',
+            document.slice(2, 5),
+            '.',
+            document.slice(5, 8),
+            '/',
+            document.slice(8, 12),
+            '-',
+            document.slice(12, 14),
+        ].join('');
+    }
+
+    return 'Incompleto na importação';
+}
+
+function formatContactType(
+    type: ContactType,
+): string {
+    if (type === 'company') {
+        return 'Empresa';
+    }
+
+    if (type === 'individual') {
+        return 'Pessoa';
+    }
+
+    return 'Não definido';
+}

@@ -1,0 +1,36 @@
+[IDEIA]
+O coração dele é a geração de relatório de gastos, Controle total de Entradas e Saídas, e também Definição de orçamentos e metas.
+Os dados para realizar tal funcionalidades entrarão através de duas maneiras: importação de arquivo (CSV, OFX ou outro) e via Open Finance.
+
+[FRONT E FUNCIONALIDADES]
+
+
+Open Finance -> Conecta e desconectar conta bancaria.
+	resumo geral
+		-> resumo financeiro geral de todas as contas conectadas;
+		-> pode selecionar quais fazer resumo geral e quais não fazer.
+	relatórios
+		-> downloads de relatórios XLSX gerados (podendo ser baixados em outros formatos futuramente).
+	orçamentos
+		-> definir limites de gastos para cada categoria para receber alertas.
+	
+	
+IMPORTAR -> Apenas importa relatório e avisa que estará disponível para download em relatórios;
+	resumo geral
+		-> resumo financeiro geral de todos os relatórios importados;
+		-> pode selecionar quais relatórios fazer resumo geral e quais não fazer.
+	relatórios
+		-> downloads de relatórios XLSX gerados (podendo ser baixados em outros formatos futuramente).
+	orçamentos
+		-> definir limites de gastos para cada categoria para receber alertas.
+
+
+[FORMATO DE RELATÓRIO XLSX]
+
+total entradas R$ x		fluxo de caixa mensal			top despesas			resumo anual
+total saídas R$ y		mes, receita, despesa,resultado		categoria, total, %		ano, receita, despesa, resultado
+saldo acumulado	R$ z		2026-01, 0.00, 100.00, -100.00		renda extra, 200.00, 20.2%	2026, 150.00, 277.00, -127.00
+				2026-02, 0.00, 57.00, -57.00		lazer, 100.00, 10.5%
+				2026-03, 50.00, 40.00, 10.00
+				2026-04, 50.00, 40.00, 10.00
+				2026-05, 50.00, 40.00, 10.00
