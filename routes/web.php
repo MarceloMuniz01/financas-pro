@@ -98,18 +98,24 @@ Route::middleware([
         [ContactController::class, 'index']
     )->name('contacts.index');
 
+    Route::post(
+        '/contacts/merge-many',
+        [ContactController::class, 'mergeMany']
+    )->name('contacts.merge-many');
+
+    Route::post(
+        '/contacts/unmerge-many',
+        [ContactController::class, 'unmergeMany']
+    )->name('contacts.unmerge-many');
+
     Route::patch(
         '/contacts/{contact}',
         [ContactController::class, 'update']
     )
         ->whereNumber('contact')
         ->name('contacts.update');
-
-    Route::post(
-        '/contacts/merge-many',
-        [ContactController::class, 'mergeMany']
-    )->name('contacts.merge-many');
 });
+
 
 /*
 |--------------------------------------------------------------------------

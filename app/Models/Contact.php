@@ -14,14 +14,15 @@ class Contact extends Model
     protected $fillable = [
         'user_id',
         'name',
+        'normalized_name',
         'document',
         'contact_type',
 
         'default_expense_category_id',
         'default_income_category_id',
 
-        'looks_like_contact_id',
-        'similarity_dismissed_at',
+        'merged_into_contact_id',
+        'merged_at',
     ];
 
     /**
@@ -30,7 +31,7 @@ class Contact extends Model
     protected function casts(): array
     {
         return [
-            'similarity_dismissed_at' => 'datetime',
+            'merged_at' => 'datetime',
         ];
     }
 
@@ -67,38 +68,32 @@ class Contact extends Model
     }
 
     /**
-     * Contato mais completo com o qual este contato se parece.
+     * Contato principal no qual este contato foi mesclado.
+     *
+     * Quando este campo estiver preenchido, este contato é
+     * considerado um contato secundário.
      */
-    public function looksLikeContact(): BelongsTo
+    public function mergedIntoContact(): BelongsTo
     {
         return $this->belongsTo(
             Contact::class,
-            'looks_like_contact_id'
+            'merged_into_contact_id'
         );
     }
 
     /**
-     * Contatos que apontam para este como possível duplicidade.
+     * Contatos secundários mesclados neste contato principal.
      */
-    public function similarContacts(): HasMany
+    public function mergedContacts(): HasMany
     {
         return $this->hasMany(
             Contact::class,
-            'looks_like_contact_id'
+            'merged_into_contact_id'
         );
     }
 
     /**
-     * Apelidos associados a este contato.
-     *
-     * Exemplo:
-     *
-     * contato principal:
-     * Maria dos Navegantes
-     *
-     * apelidos:
-     * mariadosnavegant
-     * maria navegante
+     * Apelidos associados diretamente a este contato.
      */
     public function aliases(): HasMany
     {
@@ -108,12 +103,133 @@ class Contact extends Model
     }
 
     /**
-     * Transações vinculadas ao contato.
+     * Transações vinculadas diretamente ao contato.
+     *
+     * As transações não são movidas durante a mesclagem.
+     * Elas continuam vinculadas ao contato original.
      */
     public function transactions(): HasMany
     {
         return $this->hasMany(
             Transaction::class
         );
+    }
+
+    /**
+     * Verifica se este contato é principal.
+     */
+    public function isMainContact(): bool
+    {
+        return $this->merged_into_contact_id === null;
+    }
+
+    /**
+     * Verifica se este contato está mesclado em outro.
+     */
+    public function isMergedContact(): bool
+    {
+        return $this->merged_into_contact_id !== null;
+    }
+
+    /**
+     * Retorna o contato principal efetivo.
+     *
+     * Como a regra impede cadeias de mesclagem, há somente:
+     *
+     * secundário -> principal
+     */
+    public function effectiveContact(): Contact
+    {
+        if ($this->merged_into_contact_id === null) {
+            return $this;
+        }
+
+        $this->loadMissing(
+            'mergedIntoContact'
+        );
+
+        return $this->mergedIntoContact
+            ?? $this;
+    }
+
+    /**
+     * Retorna o ID do contato principal efetivo.
+     */
+    public function effectiveContactId(): int
+    {
+        return $this->merged_into_contact_id
+            ?? $this->id;
+    }
+
+    /**
+     * Categoria efetiva de despesa.
+     *
+     * Quando o contato estiver mesclado, a categoria do
+     * contato principal sempre prevalece.
+     */
+    public function effectiveExpenseCategoryId(): ?int
+    {
+        return $this
+            ->effectiveContact()
+            ->default_expense_category_id;
+    }
+
+    /**
+     * Categoria efetiva de receita.
+     *
+     * Quando o contato estiver mesclado, a categoria do
+     * contato principal sempre prevalece.
+     */
+    public function effectiveIncomeCategoryId(): ?int
+    {
+        return $this
+            ->effectiveContact()
+            ->default_income_category_id;
+    }
+
+    /**
+     * Retorna a categoria efetiva conforme o tipo da transação.
+     */
+    public function effectiveCategoryId(
+        string $transactionType
+    ): ?int {
+        return match ($transactionType) {
+            'expense' =>
+            $this->effectiveExpenseCategoryId(),
+
+            'income' =>
+            $this->effectiveIncomeCategoryId(),
+
+            default =>
+            null,
+        };
+    }
+
+    /**
+     * Retorna a categoria de despesa efetiva.
+     */
+    public function effectiveExpenseCategory(): ?Category
+    {
+        $contact = $this->effectiveContact();
+
+        $contact->loadMissing(
+            'defaultExpenseCategory'
+        );
+
+        return $contact->defaultExpenseCategory;
+    }
+
+    /**
+     * Retorna a categoria de receita efetiva.
+     */
+    public function effectiveIncomeCategory(): ?Category
+    {
+        $contact = $this->effectiveContact();
+
+        $contact->loadMissing(
+            'defaultIncomeCategory'
+        );
+
+        return $contact->defaultIncomeCategory;
     }
 }
