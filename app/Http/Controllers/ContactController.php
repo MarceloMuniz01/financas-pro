@@ -17,7 +17,11 @@ use Inertia\Response;
 class ContactController extends Controller
 {
     /**
-     * Lista os contatos do usuário autenticado.
+     * Lista somente os contatos principais do usuário autenticado.
+     *
+     * Contatos vinculados são apresentados como parte do principal:
+     * seus nomes e aliases entram nas variações exibidas e suas
+     * transações entram na contagem agregada do grupo.
      */
     public function index(
         Request $request
@@ -47,6 +51,9 @@ class ContactController extends Controller
                 'user_id',
                 $userId
             )
+            ->whereNull(
+                'merged_into_contact_id'
+            )
             ->select([
                 'id',
                 'user_id',
@@ -56,6 +63,8 @@ class ContactController extends Controller
                 'contact_type',
                 'default_expense_category_id',
                 'default_income_category_id',
+                'merged_into_contact_id',
+                'merged_at',
                 'created_at',
                 'updated_at',
             ])
@@ -65,6 +74,31 @@ class ContactController extends Controller
                 'defaultIncomeCategory:id,name,type,color',
 
                 'aliases:id,user_id,contact_id,name,normalized_name',
+
+                'mergedContacts' => function ($query): void {
+                    $query
+                        ->select([
+                            'id',
+                            'user_id',
+                            'name',
+                            'normalized_name',
+                            'document',
+                            'contact_type',
+                            'default_expense_category_id',
+                            'default_income_category_id',
+                            'merged_into_contact_id',
+                            'merged_at',
+                            'created_at',
+                            'updated_at',
+                        ])
+                        ->with([
+                            'aliases:id,user_id,contact_id,name,normalized_name',
+                        ])
+                        ->withCount(
+                            'transactions'
+                        )
+                        ->orderBy('name');
+                },
             ])
             ->withCount(
                 'transactions'
@@ -100,6 +134,36 @@ class ContactController extends Controller
                                             "%{$search}%"
                                         );
                                     }
+                                )
+                                ->orWhereHas(
+                                    'mergedContacts',
+                                    function ($query) use ($search): void {
+                                        $query->where(
+                                            function ($query) use ($search): void {
+                                                $query
+                                                    ->where(
+                                                        'name',
+                                                        'ilike',
+                                                        "%{$search}%"
+                                                    )
+                                                    ->orWhere(
+                                                        'document',
+                                                        'ilike',
+                                                        "%{$search}%"
+                                                    )
+                                                    ->orWhereHas(
+                                                        'aliases',
+                                                        function ($query) use ($search): void {
+                                                            $query->where(
+                                                                'name',
+                                                                'ilike',
+                                                                "%{$search}%"
+                                                            );
+                                                        }
+                                                    );
+                                            }
+                                        );
+                                    }
                                 );
                         }
                     );
@@ -131,6 +195,17 @@ class ContactController extends Controller
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();
+
+        $contacts->setCollection(
+            $contacts
+                ->getCollection()
+                ->map(
+                    fn(Contact $contact): array =>
+                    $this->serializeContactGroup(
+                        $contact
+                    )
+                )
+        );
 
         $categories = Category::query()
             ->where(
@@ -186,6 +261,13 @@ class ContactController extends Controller
             userId: $userId
         );
 
+        if ($contact->merged_into_contact_id !== null) {
+            throw ValidationException::withMessages([
+                'contact' =>
+                    'Edite o contato principal deste grupo.',
+            ]);
+        }
+
         $request->merge([
             'name' => trim(
                 (string) $request->input(
@@ -227,6 +309,25 @@ class ContactController extends Controller
                         return;
                     }
 
+                    $groupContactIds = Contact::query()
+                        ->where(
+                            'user_id',
+                            $userId
+                        )
+                        ->where(
+                            function ($query) use ($contact): void {
+                                $query
+                                    ->whereKey(
+                                        $contact->id
+                                    )
+                                    ->orWhere(
+                                        'merged_into_contact_id',
+                                        $contact->id
+                                    );
+                            }
+                        )
+                        ->pluck('id');
+
                     $officialNameExists =
                         Contact::query()
                             ->where(
@@ -237,8 +338,9 @@ class ContactController extends Controller
                                 'normalized_name',
                                 $normalizedName
                             )
-                            ->whereKeyNot(
-                                $contact->id
+                            ->whereNotIn(
+                                'id',
+                                $groupContactIds
                             )
                             ->exists();
 
@@ -262,10 +364,9 @@ class ContactController extends Controller
                             'normalized_name',
                             $normalizedName
                         )
-                        ->where(
+                        ->whereNotIn(
                             'contact_id',
-                            '<>',
-                            $contact->id
+                            $groupContactIds
                         )
                         ->exists();
 
@@ -561,6 +662,257 @@ class ContactController extends Controller
                 : count($contactIds)
                 . ' contatos foram mesclados com sucesso.'
             );
+    }
+
+    /**
+     * Desmescla os contatos selecionados de um contato principal.
+     */
+    public function unmergeMany(
+        Request $request,
+        ContactMergeService $mergeService
+    ): RedirectResponse {
+        $userId = (int) $request->user()->id;
+
+        $validated = $request->validate([
+            'main_contact_id' => [
+                'required',
+                'integer',
+
+                Rule::exists(
+                    'contacts',
+                    'id'
+                )->where(
+                        fn($query) =>
+                        $query
+                            ->where(
+                                'user_id',
+                                $userId
+                            )
+                            ->whereNull(
+                                'merged_into_contact_id'
+                            )
+                    ),
+            ],
+
+            'contact_ids' => [
+                'required',
+                'array',
+                'min:1',
+                'max:100',
+            ],
+
+            'contact_ids.*' => [
+                'required',
+                'integer',
+                'distinct',
+
+                Rule::exists(
+                    'contacts',
+                    'id'
+                )->where(
+                        fn($query) =>
+                        $query->where(
+                            'user_id',
+                            $userId
+                        )
+                    ),
+            ],
+        ]);
+
+        $mainContactId =
+            (int) $validated[
+                'main_contact_id'
+            ];
+
+        $contactIds = array_values(
+            array_unique(
+                array_map(
+                    'intval',
+                    $validated[
+                        'contact_ids'
+                    ]
+                )
+            )
+        );
+
+        /*
+         * Garante que todos os contatos selecionados
+         * realmente pertencem ao principal informado.
+         */
+        $validContactIds = Contact::query()
+            ->where(
+                'user_id',
+                $userId
+            )
+            ->where(
+                'merged_into_contact_id',
+                $mainContactId
+            )
+            ->whereIn(
+                'id',
+                $contactIds
+            )
+            ->pluck('id')
+            ->map(
+                static fn($id): int =>
+                (int) $id
+            )
+            ->all();
+
+        if (
+            count($validContactIds)
+            !== count($contactIds)
+        ) {
+            throw ValidationException::withMessages([
+                'contacts' =>
+                    'Um ou mais contatos selecionados não pertencem a esse grupo.',
+            ]);
+        }
+
+        foreach (
+            $validContactIds
+            as $contactId
+        ) {
+            $mergeService->unmerge(
+                userId: $userId,
+                contactId: $contactId
+            );
+        }
+
+        return redirect()
+            ->route('contacts.index')
+            ->with(
+                'success',
+                count($validContactIds) === 1
+                ? 'Contato desmesclado com sucesso.'
+                : count($validContactIds)
+                . ' contatos foram desmesclados com sucesso.'
+            );
+    }
+
+    /**
+     * Transforma um contato principal e seus vinculados em um
+     * único registro de apresentação para o frontend.
+     *
+     * @return array<string, mixed>
+     */
+    private function serializeContactGroup(
+        Contact $contact
+    ): array {
+        $aliases = $contact
+            ->aliases
+            ->map(
+                static fn($alias): array => [
+                    'id' => (int) $alias->id,
+                    'user_id' => (int) $alias->user_id,
+                    'contact_id' => (int) $alias->contact_id,
+                    'linked_contact_id' => null,
+                    'name' => $alias->name,
+                    'normalized_name' => $alias->normalized_name,
+                    'source' => 'alias',
+                ]
+            );
+
+        $transactionsCount =
+            (int) $contact->transactions_count;
+
+        foreach (
+            $contact->mergedContacts
+            as $linkedContact
+        ) {
+            $transactionsCount +=
+                (int) $linkedContact->transactions_count;
+
+            $aliases->push([
+                'id' => -((int) $linkedContact->id),
+                'user_id' => (int) $linkedContact->user_id,
+                'contact_id' => (int) $contact->id,
+                'linked_contact_id' => (int) $linkedContact->id,
+                'name' => $linkedContact->name,
+                'normalized_name' => $linkedContact->normalized_name,
+                'source' => 'linked_contact',
+            ]);
+
+            foreach (
+                $linkedContact->aliases
+                as $linkedAlias
+            ) {
+                $aliases->push([
+                    'id' => (int) $linkedAlias->id,
+                    'user_id' => (int) $linkedAlias->user_id,
+                    'contact_id' => (int) $contact->id,
+                    'linked_contact_id' => (int) $linkedContact->id,
+                    'name' => $linkedAlias->name,
+                    'normalized_name' => $linkedAlias->normalized_name,
+                    'source' => 'linked_alias',
+                ]);
+            }
+        }
+
+        $aliases = $aliases
+            ->reject(
+                fn(array $alias): bool =>
+                $alias['normalized_name']
+                === $contact->normalized_name
+            )
+            ->unique(
+                'normalized_name'
+            )
+            ->sortBy(
+                static fn(array $alias): string =>
+                mb_strtolower(
+                    $alias['name'],
+                    'UTF-8'
+                )
+            )
+            ->values();
+
+        return [
+            'id' => (int) $contact->id,
+            'user_id' => (int) $contact->user_id,
+            'name' => $contact->name,
+            'normalized_name' => $contact->normalized_name,
+            'document' => $contact->document,
+            'contact_type' => $contact->contact_type,
+            'default_expense_category_id' =>
+                $contact->default_expense_category_id,
+            'default_income_category_id' =>
+                $contact->default_income_category_id,
+            'default_expense_category' =>
+                $contact->defaultExpenseCategory,
+            'default_income_category' =>
+                $contact->defaultIncomeCategory,
+            'aliases' => $aliases,
+            'transactions_count' => $transactionsCount,
+            'linked_contacts_count' =>
+                $contact->mergedContacts->count(),
+            'linked_contacts' => $contact
+                ->mergedContacts
+                ->map(
+                    static fn(Contact $linkedContact): array => [
+                        'id' => (int) $linkedContact->id,
+                        'name' => $linkedContact->name,
+                        'normalized_name' =>
+                            $linkedContact->normalized_name,
+                        'document' => $linkedContact->document,
+                        'contact_type' =>
+                            $linkedContact->contact_type,
+                        'merged_at' =>
+                            $linkedContact->merged_at
+                                    ?->toISOString(),
+                        'transactions_count' =>
+                            (int) $linkedContact
+                                ->transactions_count,
+                    ]
+                )
+                ->values(),
+            'created_at' =>
+                $contact->created_at
+                        ?->toISOString(),
+            'updated_at' =>
+                $contact->updated_at
+                        ?->toISOString(),
+        ];
     }
 
     /**
