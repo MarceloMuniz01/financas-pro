@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+      target: app
+    env_file:
+      - .env.docker
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      target: nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      - app
+    restart: unless-stopped
