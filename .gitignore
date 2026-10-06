@@ -6,6 +6,7 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/logs/*
 /storage/pail
 /resources/js/actions
 /resources/js/routes

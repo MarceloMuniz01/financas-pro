@@ -1,13 +1,13 @@
 <?php
 
-$caminhoArquivo = 'extrato_inter.csv';
-$arquivoCidades = 'cidades.txt';
+$caminhoArquivo = __DIR__ . '/extrato_inter.csv';
+$arquivoCidades = __DIR__ . '/cidades.txt';
 
 // 1. Garante que a lista de cidades exista localmente (Se não existir, baixa do IBGE)
 garantirListaCidadesLocal($arquivoCidades);
 
 if (($objetoArquivo = fopen($caminhoArquivo, 'r')) !== false) {
-    
+
     // 2. Pula dinamicamente os metadados iniciais até achar o cabeçalho oficial do banco
     while (($linhaTexto = fgets($objetoArquivo)) !== false) {
         if (str_starts_with(trim($linhaTexto), 'Data Lançamento;')) {
@@ -15,14 +15,14 @@ if (($objetoArquivo = fopen($caminhoArquivo, 'r')) !== false) {
             break;
         }
     }
-    
+
     if (!isset($headerLine)) {
         die("Erro: Cabeçalho válido não encontrado no extrato.\n");
     }
-    
+
     $header = str_getcsv($headerLine, ';');
     $header = array_map('trim', $header);
-    
+
     // Carrega a lista de cidades na memória para busca rápida O(1)
     $cidadesValidas = carregarCidades($arquivoCidades);
     $transactions = [];
@@ -35,7 +35,7 @@ if (($objetoArquivo = fopen($caminhoArquivo, 'r')) !== false) {
         }
 
         $rowValues = str_getcsv($linhaTexto, ';');
-        
+
         // Garante a integridade estrutural das colunas da linha
         if (count($header) !== count($rowValues)) {
             continue;
@@ -46,7 +46,7 @@ if (($objetoArquivo = fopen($caminhoArquivo, 'r')) !== false) {
 
         // Mapeia a transação e extrai o nome limpando a cauda de localização
         $metodoMapeado = mapearMetodo($linhaTexto);
-        $contatoLimpo  = extrairNomeContatoComLista($descricaoBruta, $cidadesValidas);
+        $contatoLimpo = extrairNomeContatoComLista($descricaoBruta, $cidadesValidas);
 
         // FALLBACK: Se por algum motivo bizarro a string sumir por completo,
         // recupera a descrição bruta para não perder o registro financeiro
@@ -60,16 +60,16 @@ if (($objetoArquivo = fopen($caminhoArquivo, 'r')) !== false) {
 
         // Monta o schema estruturado final
         $transactions[] = [
-            'transaction_date'  => formatarData($row['Data Lançamento']),
+            'transaction_date' => formatarData($row['Data Lançamento']),
             'counterparty_name' => $contatoLimpo,
-            'amount'            => $amount,
-            'type'              => $amount < 0 ? 'expense' : 'income',
-            'method'            => $metodoMapeado
+            'amount' => $amount,
+            'type' => $amount < 0 ? 'expense' : 'income',
+            'method' => $metodoMapeado
         ];
     }
 
     fclose($objetoArquivo);
-    
+
     // Renderiza o array tratado no terminal
     print_r($transactions);
 }
@@ -78,11 +78,12 @@ if (($objetoArquivo = fopen($caminhoArquivo, 'r')) !== false) {
  * Remove a cidade e o país focando exclusivamente nos últimos índices do texto.
  * Prioriza o casamento com a maior string de cidade possível para evitar falsos cortes em cidades compostas.
  */
-function extrairNomeContatoComLista($description, $cidadesValidas) {
+function extrairNomeContatoComLista($description, $cidadesValidas)
+{
     // 1. Normalização inicial de espaços brancos
     $texto = str_replace("\t", "   ", $description);
     $texto = str_replace(["\xA0", "&nbsp;"], " ", $texto);
-    $texto = preg_replace('/\s{2,}/', ' ', $texto); 
+    $texto = preg_replace('/\s{2,}/', ' ', $texto);
     $texto = trim($texto);
 
     // 2. Remove o "BRA" ou "BR" isolado no fim absoluto se existir
@@ -126,11 +127,11 @@ function extrairNomeContatoComLista($description, $cidadesValidas) {
         // ESTRATÉGIA 2: Se não removeu no composto, testa apenas a ÚLTIMA palavra isolada (Ex: "BRASIL", "BRASILIA")
         if (!$removeuLocalizacao) {
             $ultimaPalavra = $palavrasTratadas[$qtdPalavras - 1];
-            
+
             // Match exato direto nas chaves da tabela hash
             if (isset($cidadesValidas[$ultimaPalavra])) {
                 unset($palavrasOriginais[$qtdPalavras - 1]);
-            } 
+            }
             // Match por truncamento simples da última palavra (mínimo de 5 letras para evitar falsos positivos)
             elseif (strlen($ultimaPalavra) >= 5) {
                 $prefixoAlvo = mb_substr($ultimaPalavra, 0, 5);
@@ -155,11 +156,12 @@ function extrairNomeContatoComLista($description, $cidadesValidas) {
  * Agrupa as cidades pelas suas primeiras 5 letras e ordena por tamanho de string decrescente.
  * Permite buscar matches parciais de cidades grandes sem varrer 5k linhas de loops a cada iteração.
  */
-function generarMapaPrefixos($listaCidades) {
+function generarMapaPrefixos($listaCidades)
+{
     $mapa = [];
-    
+
     // Força as strings mais longas (Ex: CACHOEIRA GRANDE) a ficarem no topo da lista de busca
-    usort($listaCidades, function($a, $b) {
+    usort($listaCidades, function ($a, $b) {
         return strlen($b) <=> strlen($a);
     });
 
@@ -175,7 +177,8 @@ function generarMapaPrefixos($listaCidades) {
 /**
  * Remove acentos e caracteres especiais latinos para normalização estrita
  */
-function removerAcentos($string) {
+function removerAcentos($string)
+{
     return preg_replace(
         ['/[ÁÀÂÃÄáàâãä]/u', '/[ÉÈÊËéèêë]/u', '/[ÍÌÎÏíìîï]/u', '/[ÓÒÔÕÖóòôõö]/u', '/[ÚÙÛÜúùûü]/u', '/[Çç]/u'],
         ['A', 'E', 'I', 'O', 'U', 'C'],
@@ -186,14 +189,15 @@ function removerAcentos($string) {
 /**
  * Consome a API estruturada do IBGE e gera um arquivo de dicionário limpo local por segurança e performance
  */
-function garantirListaCidadesLocal($arquivoDestino) {
+function garantirListaCidadesLocal($arquivoDestino)
+{
     if (file_exists($arquivoDestino)) {
         return;
     }
 
     echo "Aguarde: Baixando lista oficial de municípios do IBGE para o arquivo local...\n";
     $url = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios";
-    
+
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -232,7 +236,8 @@ function garantirListaCidadesLocal($arquivoDestino) {
 /**
  * Carrega o arquivo local plano para uma tabela Hash na memória
  */
-function carregarCidades($caminho) {
+function carregarCidades($caminho)
+{
     $linhas = file($caminho, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     $estruturaBusca = [];
     foreach ($linhas as $linha) {
@@ -244,7 +249,8 @@ function carregarCidades($caminho) {
 /**
  * Converte datas brasileiras DD/MM/AAAA para formato internacional SQL ISO
  */
-function formatarData($date) {
+function formatarData($date)
+{
     [$day, $month, $year] = array_map('trim', explode('/', trim($date)));
     return "{$year}-{$month}-{$day}";
 }
@@ -252,17 +258,22 @@ function formatarData($date) {
 /**
  * Mapeia heurísticas do texto bruto da linha para deduzir o canal financeiro utilizado
  */
-function mapearMetodo($textoCompletoLinha) {
+function mapearMetodo($textoCompletoLinha)
+{
     if (preg_match('/(débito|debito|cartao|cartão|compra|pag\*|picpay\*|mercadopago)/i', $textoCompletoLinha)) {
         return 'card';
     }
-    if (stripos($textoCompletoLinha, 'pix') !== false) return 'pix';
-    if (stripos($textoCompletoLinha, 'ted') !== false) return 'ted';
-    if (stripos($textoCompletoLinha, 'doc') !== false) return 'doc';
-    if (stripos($textoCompletoLinha, 'boleto') !== false) return 'boleto';
-    
+    if (stripos($textoCompletoLinha, 'pix') !== false)
+        return 'pix';
+    if (stripos($textoCompletoLinha, 'ted') !== false)
+        return 'ted';
+    if (stripos($textoCompletoLinha, 'doc') !== false)
+        return 'doc';
+    if (stripos($textoCompletoLinha, 'boleto') !== false)
+        return 'boleto';
+
     if (preg_match('/(tarifa|cesta|iof|juros|manutencao)/i', $textoCompletoLinha)) {
-        return 'other'; 
+        return 'other';
     }
     return 'unknown';
 }
