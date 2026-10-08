@@ -16,3 +16,18 @@ services:
     depends_on:
       - app
     restart: unless-stopped
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/up"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
