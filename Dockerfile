@@ -72,6 +72,9 @@ FROM php-base AS app
 ENV APP_ENV=production
 ENV LOG_CHANNEL=stderr
 
+COPY docker/php/production.ini \
+    ${PHP_INI_DIR}/conf.d/99-production.ini
+
 COPY --from=builder --chown=www-data:www-data \
     /var/www/html /var/www/html
 

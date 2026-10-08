@@ -1,4 +1,4 @@
-name: tests
+name: Tests
 
 on:
   push:
@@ -17,48 +17,96 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
+  tests:
+    name: PHP ${{ matrix.php-version }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     strategy:
+      fail-fast: false
       matrix:
-        php-version: ['8.3', '8.4', '8.5']
+        php-version:
+          - '8.4'
+          - '8.5'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: financas_pro_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d financas_pro_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      APP_ENV: testing
+
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: financas_pro_test
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
           php-version: ${{ matrix.php-version }}
+          extensions: mbstring, intl, pdo_pgsql, pgsql, zip, bcmath, pcntl
           tools: composer:v2
-          coverage: xdebug
+          coverage: none
 
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
+          cache: npm
 
-      - name: Install Node Dependencies
-        run: npm i
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader
 
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+      - name: Install Node dependencies
+        run: npm ci
 
-      - name: Copy Environment File
+      - name: Copy environment file
         run: cp .env.example .env
 
-      - name: Generate Application Key
+      - name: Generate application key
         run: php artisan key:generate
 
-      - name: Build Assets
+      - name: Run migrations
+        run: php artisan migrate --force
+
+      - name: Build frontend
         run: npm run build
 
-      - name: Run Type Analysis
+      - name: Check TypeScript
+        run: npm run types:check
+
+      - name: Run PHP static analysis
         run: composer types:check
 
-      - name: Tests
+      - name: Run tests
         run: php artisan test
