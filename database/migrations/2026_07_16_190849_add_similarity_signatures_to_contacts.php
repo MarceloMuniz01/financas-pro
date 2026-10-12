@@ -6,7 +6,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         /*
@@ -55,16 +56,13 @@ return new class extends Migration {
                             );
 
                         $updates[] = [
-                            'id' =>
-                                (int) $contact->id,
+                            'id' => (int) $contact->id,
 
-                            'similarity_signature' =>
-                                $keys[
+                            'similarity_signature' => $keys[
                                     'similarity_signature'
                                 ],
 
-                            'similarity_prefix' =>
-                                $keys[
+                            'similarity_prefix' => $keys[
                                     'similarity_prefix'
                                 ],
                         ];
@@ -77,13 +75,11 @@ return new class extends Migration {
                                 $update['id']
                             )
                             ->update([
-                                'similarity_signature' =>
-                                    $update[
+                                'similarity_signature' => $update[
                                         'similarity_signature'
                                     ],
 
-                                'similarity_prefix' =>
-                                    $update[
+                                'similarity_prefix' => $update[
                                         'similarity_prefix'
                                     ],
                             ]);
