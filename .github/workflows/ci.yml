@@ -53,6 +53,9 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Generate Wayfinder files
+        run: php artisan wayfinder:generate
+
       - name: Check PHP formatting
         run: composer lint:check
 
