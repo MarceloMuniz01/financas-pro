@@ -1,15 +1,17 @@
 <?php
 
+use App\Services\Contacts\ContactSimilaritySignature;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         /*
-         * Colunas históricas da funcionalidade de similaridade.
+         * Começam nullable para permitir o preenchimento
+         * dos contatos existentes.
          */
         Schema::table(
             'contacts',
@@ -31,6 +33,64 @@ return new class extends Migration
                     );
             }
         );
+
+        /*
+         * Preenche contatos existentes.
+         */
+        DB::table('contacts')
+            ->select([
+                'id',
+                'name',
+            ])
+            ->orderBy('id')
+            ->chunkById(
+                1000,
+                function ($contacts): void {
+                    $updates = [];
+
+                    foreach ($contacts as $contact) {
+                        $keys =
+                            ContactSimilaritySignature::make(
+                                $contact->name
+                            );
+
+                        $updates[] = [
+                            'id' =>
+                                (int) $contact->id,
+
+                            'similarity_signature' =>
+                                $keys[
+                                    'similarity_signature'
+                                ],
+
+                            'similarity_prefix' =>
+                                $keys[
+                                    'similarity_prefix'
+                                ],
+                        ];
+                    }
+
+                    foreach ($updates as $update) {
+                        DB::table('contacts')
+                            ->where(
+                                'id',
+                                $update['id']
+                            )
+                            ->update([
+                                'similarity_signature' =>
+                                    $update[
+                                        'similarity_signature'
+                                    ],
+
+                                'similarity_prefix' =>
+                                    $update[
+                                        'similarity_prefix'
+                                    ],
+                            ]);
+                    }
+                },
+                'id'
+            );
 
         /*
          * Índices B-tree compostos pelo usuário.
