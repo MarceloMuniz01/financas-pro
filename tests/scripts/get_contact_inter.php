@@ -1,7 +1,7 @@
 <?php
 
-$caminhoArquivo = __DIR__ . '/extrato_inter.csv';
-$arquivoCidades = __DIR__ . '/cidades.txt';
+$caminhoArquivo = __DIR__.'/extrato_inter.csv';
+$arquivoCidades = __DIR__.'/cidades.txt';
 
 // 1. Garante que a lista de cidades exista localmente (Se não existir, baixa do IBGE)
 garantirListaCidadesLocal($arquivoCidades);
@@ -16,8 +16,8 @@ if (($objetoArquivo = fopen($caminhoArquivo, 'r')) !== false) {
         }
     }
 
-    if (!isset($headerLine)) {
-        die("Erro: Cabeçalho válido não encontrado no extrato.\n");
+    if (! isset($headerLine)) {
+        exit("Erro: Cabeçalho válido não encontrado no extrato.\n");
     }
 
     $header = str_getcsv($headerLine, ';');
@@ -64,7 +64,7 @@ if (($objetoArquivo = fopen($caminhoArquivo, 'r')) !== false) {
             'counterparty_name' => $contatoLimpo,
             'amount' => $amount,
             'type' => $amount < 0 ? 'expense' : 'income',
-            'method' => $metodoMapeado
+            'method' => $metodoMapeado,
         ];
     }
 
@@ -81,8 +81,8 @@ if (($objetoArquivo = fopen($caminhoArquivo, 'r')) !== false) {
 function extrairNomeContatoComLista($description, $cidadesValidas)
 {
     // 1. Normalização inicial de espaços brancos
-    $texto = str_replace("\t", "   ", $description);
-    $texto = str_replace(["\xA0", "&nbsp;"], " ", $texto);
+    $texto = str_replace("\t", '   ', $description);
+    $texto = str_replace(["\xA0", '&nbsp;'], ' ', $texto);
     $texto = preg_replace('/\s{2,}/', ' ', $texto);
     $texto = trim($texto);
 
@@ -108,7 +108,7 @@ function extrairNomeContatoComLista($description, $cidadesValidas)
 
         // ESTRATÉGIA 1: Testar as DUAS últimas palavras juntas (Casos de nomes compostos truncados: "CACHOEIRA GRA")
         if ($qtdPalavras >= 2) {
-            $combinacaoDuasPalavras = $palavrasTratadas[$qtdPalavras - 2] . ' ' . $palavrasTratadas[$qtdPalavras - 1];
+            $combinacaoDuasPalavras = $palavrasTratadas[$qtdPalavras - 2].' '.$palavrasTratadas[$qtdPalavras - 1];
             $prefixoAlvo = mb_substr($combinacaoDuasPalavras, 0, 5);
 
             if (isset($mapaPrefixos[$prefixoAlvo])) {
@@ -125,7 +125,7 @@ function extrairNomeContatoComLista($description, $cidadesValidas)
         }
 
         // ESTRATÉGIA 2: Se não removeu no composto, testa apenas a ÚLTIMA palavra isolada (Ex: "BRASIL", "BRASILIA")
-        if (!$removeuLocalizacao) {
+        if (! $removeuLocalizacao) {
             $ultimaPalavra = $palavrasTratadas[$qtdPalavras - 1];
 
             // Match exato direto nas chaves da tabela hash
@@ -171,6 +171,7 @@ function generarMapaPrefixos($listaCidades)
             $mapa[$prefixo][] = $cidade;
         }
     }
+
     return $mapa;
 }
 
@@ -196,7 +197,7 @@ function garantirListaCidadesLocal($arquivoDestino)
     }
 
     echo "Aguarde: Baixando lista oficial de municípios do IBGE para o arquivo local...\n";
-    $url = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios";
+    $url = 'https://servicodados.ibge.gov.br/api/v1/localidades/municipios';
 
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -205,13 +206,13 @@ function garantirListaCidadesLocal($arquivoDestino)
     $resposta = curl_exec($ch);
     curl_close($ch);
 
-    if (!$resposta) {
-        die("Erro fatal: Não foi possível obter os dados do IBGE. Verifique sua conexão de rede.\n");
+    if (! $resposta) {
+        exit("Erro fatal: Não foi possível obter os dados do IBGE. Verifique sua conexão de rede.\n");
     }
 
     $municipios = json_decode($resposta, true);
-    if (!is_array($municipios)) {
-        die("Erro fatal: O formato de payload JSON retornado pela API do IBGE é inválido.\n");
+    if (! is_array($municipios)) {
+        exit("Erro fatal: O formato de payload JSON retornado pela API do IBGE é inválido.\n");
     }
 
     $cidadesLimpas = [];
@@ -243,6 +244,7 @@ function carregarCidades($caminho)
     foreach ($linhas as $linha) {
         $estruturaBusca[trim($linha)] = true;
     }
+
     return $estruturaBusca;
 }
 
@@ -252,6 +254,7 @@ function carregarCidades($caminho)
 function formatarData($date)
 {
     [$day, $month, $year] = array_map('trim', explode('/', trim($date)));
+
     return "{$year}-{$month}-{$day}";
 }
 
@@ -263,17 +266,22 @@ function mapearMetodo($textoCompletoLinha)
     if (preg_match('/(débito|debito|cartao|cartão|compra|pag\*|picpay\*|mercadopago)/i', $textoCompletoLinha)) {
         return 'card';
     }
-    if (stripos($textoCompletoLinha, 'pix') !== false)
+    if (stripos($textoCompletoLinha, 'pix') !== false) {
         return 'pix';
-    if (stripos($textoCompletoLinha, 'ted') !== false)
+    }
+    if (stripos($textoCompletoLinha, 'ted') !== false) {
         return 'ted';
-    if (stripos($textoCompletoLinha, 'doc') !== false)
+    }
+    if (stripos($textoCompletoLinha, 'doc') !== false) {
         return 'doc';
-    if (stripos($textoCompletoLinha, 'boleto') !== false)
+    }
+    if (stripos($textoCompletoLinha, 'boleto') !== false) {
         return 'boleto';
+    }
 
     if (preg_match('/(tarifa|cesta|iof|juros|manutencao)/i', $textoCompletoLinha)) {
         return 'other';
     }
+
     return 'unknown';
 }

@@ -14,11 +14,11 @@ class BankDetector
     /**
      * Identifica o banco lendo apenas o início do arquivo.
      *
-     * @param resource $stream
+     * @param  resource  $stream
      */
     public function detect($stream): string
     {
-        if (!is_resource($stream)) {
+        if (! is_resource($stream)) {
             throw new RuntimeException(
                 'O arquivo informado para detecção não é um stream válido.'
             );
@@ -128,7 +128,7 @@ class BankDetector
     /**
      * Retorna o stream ao início para o parser.
      *
-     * @param resource $stream
+     * @param  resource  $stream
      */
     private function rewindStream($stream): void
     {

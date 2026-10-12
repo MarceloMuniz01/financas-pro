@@ -2,14 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ContactAlias extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'user_id',
         'contact_id',
@@ -19,6 +16,8 @@ class ContactAlias extends Model
 
     /**
      * Usuário dono do apelido.
+     *
+     * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
     {
@@ -29,6 +28,8 @@ class ContactAlias extends Model
 
     /**
      * Contato principal representado por este apelido.
+     *
+     * @return BelongsTo<Contact, $this>
      */
     public function contact(): BelongsTo
     {

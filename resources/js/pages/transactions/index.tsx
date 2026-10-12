@@ -1,10 +1,10 @@
-import AppLayout from "@/layouts/app-layout";
-import { Head, router, usePage } from "@inertiajs/react";
-import { useMemo, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import { Head, router, usePage } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import AppLayout from '@/layouts/app-layout';
 
-type TransactionType = "income" | "expense";
-type ContactType = "company" | "individual" | null;
+type TransactionType = 'income' | 'expense';
+type ContactType = 'company' | 'individual' | null;
 
 type LinkedContact = {
     id: number;
@@ -119,21 +119,23 @@ type Props = {
 };
 
 type CategoryChangeScope =
-    "current" | "all_from_contact" | "current_and_future";
+    | 'current'
+    | 'all_from_contact'
+    | 'current_and_future';
 
 const breadcrumbs = [
     {
-        title: "Transações",
-        href: "/transactions",
+        title: 'Transações',
+        href: '/transactions',
     },
 ];
 
 const emptyFilters: Filters = {
-    search: "",
-    type: "",
-    category_id: "",
-    date_from: "",
-    date_to: "",
+    search: '',
+    type: '',
+    category_id: '',
+    date_from: '',
+    date_to: '',
 };
 
 export default function TransactionsIndex({
@@ -150,7 +152,7 @@ export default function TransactionsIndex({
         useState<TransactionItem | null>(null);
 
     const filteredCategories = useMemo(() => {
-        if (filters.type !== "income" && filters.type !== "expense") {
+        if (filters.type !== 'income' && filters.type !== 'expense') {
             return categories;
         }
 
@@ -164,13 +166,17 @@ export default function TransactionsIndex({
                 [name]: value,
             };
 
-            if (name === "type" && current.category_id) {
+            if (name === 'type' && current.category_id) {
                 const selectedCategory = categories.find(
                     (category) => category.id === Number(current.category_id),
                 );
 
-                if (selectedCategory && value && selectedCategory.type !== value) {
-                    next.category_id = "";
+                if (
+                    selectedCategory &&
+                    value &&
+                    selectedCategory.type !== value
+                ) {
+                    next.category_id = '';
                 }
             }
 
@@ -181,7 +187,7 @@ export default function TransactionsIndex({
     function applyFilters(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
-        router.get("/transactions", compactFilters(filters), {
+        router.get('/transactions', compactFilters(filters), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -192,7 +198,7 @@ export default function TransactionsIndex({
         setFilters(emptyFilters);
 
         router.get(
-            "/transactions",
+            '/transactions',
             {},
             {
                 preserveState: true,
@@ -211,7 +217,8 @@ export default function TransactionsIndex({
                     <h1 className="text-2xl font-semibold">Transações</h1>
 
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Consulte e organize as movimentações importadas dos seus extratos.
+                        Consulte e organize as movimentações importadas dos seus
+                        extratos.
                     </p>
                 </header>
 
@@ -219,7 +226,9 @@ export default function TransactionsIndex({
                     <FeedbackMessage type="success" message={flash.success} />
                 )}
 
-                {flash?.error && <FeedbackMessage type="error" message={flash.error} />}
+                {flash?.error && (
+                    <FeedbackMessage type="error" message={flash.error} />
+                )}
 
                 <section className="grid gap-4 md:grid-cols-3">
                     <SummaryCard
@@ -238,7 +247,9 @@ export default function TransactionsIndex({
                         title="Saldo"
                         value={totals.balance}
                         valueClassName={
-                            totals.balance >= 0 ? "text-green-600" : "text-red-600"
+                            totals.balance >= 0
+                                ? 'text-green-600'
+                                : 'text-red-600'
                         }
                     />
                 </section>
@@ -257,11 +268,12 @@ export default function TransactionsIndex({
 
                         <p className="mt-1 text-sm text-muted-foreground">
                             {transactions.total === 0
-                                ? "Nenhuma transação encontrada."
-                                : `${transactions.total} ${transactions.total === 1
-                                    ? "transação encontrada"
-                                    : "transações encontradas"
-                                }.`}
+                                ? 'Nenhuma transação encontrada.'
+                                : `${transactions.total} ${
+                                      transactions.total === 1
+                                          ? 'transação encontrada'
+                                          : 'transações encontradas'
+                                  }.`}
                         </p>
                     </div>
 
@@ -319,7 +331,9 @@ function TransactionFilters({
                         id="search"
                         type="search"
                         value={filters.search}
-                        onChange={(event) => onChange("search", event.target.value)}
+                        onChange={(event) =>
+                            onChange('search', event.target.value)
+                        }
                         placeholder="Descrição, contato ou documento"
                         className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                     />
@@ -329,7 +343,9 @@ function TransactionFilters({
                     <select
                         id="type"
                         value={filters.type}
-                        onChange={(event) => onChange("type", event.target.value)}
+                        onChange={(event) =>
+                            onChange('type', event.target.value)
+                        }
                         className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     >
                         <option value="">Todos</option>
@@ -342,7 +358,9 @@ function TransactionFilters({
                     <select
                         id="category_id"
                         value={filters.category_id}
-                        onChange={(event) => onChange("category_id", event.target.value)}
+                        onChange={(event) =>
+                            onChange('category_id', event.target.value)
+                        }
                         className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     >
                         <option value="">Todas</option>
@@ -360,7 +378,9 @@ function TransactionFilters({
                         id="date_from"
                         type="date"
                         value={filters.date_from}
-                        onChange={(event) => onChange("date_from", event.target.value)}
+                        onChange={(event) =>
+                            onChange('date_from', event.target.value)
+                        }
                         className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     />
                 </FilterField>
@@ -371,7 +391,9 @@ function TransactionFilters({
                         type="date"
                         value={filters.date_to}
                         min={filters.date_from || undefined}
-                        onChange={(event) => onChange("date_to", event.target.value)}
+                        onChange={(event) =>
+                            onChange('date_to', event.target.value)
+                        }
                         className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     />
                 </FilterField>
@@ -400,7 +422,7 @@ function TransactionFilters({
 function FilterField({
     label,
     htmlFor,
-    className = "",
+    className = '',
     children,
 }: {
     label: string;
@@ -410,7 +432,10 @@ function FilterField({
 }) {
     return (
         <div className={className}>
-            <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium">
+            <label
+                htmlFor={htmlFor}
+                className="mb-1.5 block text-sm font-medium"
+            >
                 {label}
             </label>
 
@@ -456,15 +481,16 @@ function TransactionTable({
 
 function TableHeader({
     children,
-    align = "left",
+    align = 'left',
 }: {
     children: ReactNode;
-    align?: "left" | "right";
+    align?: 'left' | 'right';
 }) {
     return (
         <th
-            className={`px-4 py-3 font-medium md:px-6 ${align === "right" ? "text-right" : ""
-                }`}
+            className={`px-4 py-3 font-medium md:px-6 ${
+                align === 'right' ? 'text-right' : ''
+            }`}
         >
             {children}
         </th>
@@ -480,12 +506,15 @@ function TransactionRow({
 }) {
     return (
         <tr className="border-b last:border-b-0 hover:bg-muted/30">
-            <td className="whitespace-nowrap px-4 py-4 md:px-6">
+            <td className="px-4 py-4 whitespace-nowrap md:px-6">
                 {formatDate(transaction.transaction_date)}
             </td>
 
             <td className="max-w-sm px-4 py-4 md:px-6">
-                <div className="truncate font-medium" title={transaction.description}>
+                <div
+                    className="truncate font-medium"
+                    title={transaction.description}
+                >
                     {transaction.description}
                 </div>
 
@@ -519,8 +548,9 @@ function TransactionRow({
             </td>
 
             <td
-                className={`whitespace-nowrap px-4 py-4 text-right font-semibold md:px-6 ${transaction.amount >= 0 ? "text-green-600" : "text-red-600"
-                    }`}
+                className={`px-4 py-4 text-right font-semibold whitespace-nowrap md:px-6 ${
+                    transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}
             >
                 {formatCurrency(transaction.amount)}
             </td>
@@ -536,23 +566,26 @@ function ContactCell({ transaction }: { transaction: TransactionItem }) {
     return (
         <div className="min-w-0">
             <div className="flex items-center gap-2">
-                <span className="truncate font-medium">{transaction.contact.name}</span>
+                <span className="truncate font-medium">
+                    {transaction.contact.name}
+                </span>
 
                 {transaction.contact.linked_contacts_count > 0 && (
-                    <span className="whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
-                        {transaction.contact.linked_contacts_count}{" "}
+                    <span className="rounded-full border px-2 py-0.5 text-[11px] whitespace-nowrap text-muted-foreground">
+                        {transaction.contact.linked_contacts_count}{' '}
                         {transaction.contact.linked_contacts_count === 1
-                            ? "mesclado"
-                            : "mesclados"}
+                            ? 'mesclado'
+                            : 'mesclados'}
                     </span>
                 )}
             </div>
 
-            {transaction.is_from_merged_contact && transaction.original_contact && (
-                <div className="mt-1 text-xs text-muted-foreground">
-                    Importado como {transaction.original_contact.name}
-                </div>
-            )}
+            {transaction.is_from_merged_contact &&
+                transaction.original_contact && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                        Importado como {transaction.original_contact.name}
+                    </div>
+                )}
         </div>
     );
 }
@@ -606,10 +639,10 @@ function CategoryChangeModal({
     );
 
     const [categoryId, setCategoryId] = useState(
-        transaction.category?.id.toString() ?? "",
+        transaction.category?.id.toString() ?? '',
     );
 
-    const [scope, setScope] = useState<CategoryChangeScope>("current");
+    const [scope, setScope] = useState<CategoryChangeScope>('current');
 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -621,12 +654,14 @@ function CategoryChangeModal({
         event.preventDefault();
 
         if (!categoryId) {
-            setError("Selecione uma categoria.");
+            setError('Selecione uma categoria.');
+
             return;
         }
 
-        if (!hasContact && scope !== "current") {
-            setError("Esta transação não possui um contato associado.");
+        if (!hasContact && scope !== 'current') {
+            setError('Esta transação não possui um contato associado.');
+
             return;
         }
 
@@ -647,8 +682,8 @@ function CategoryChangeModal({
                 onError: (errors) => {
                     setError(
                         errors.category_id ||
-                        errors.scope ||
-                        "Não foi possível atualizar a categoria.",
+                            errors.scope ||
+                            'Não foi possível atualizar a categoria.',
                     );
                 },
 
@@ -670,24 +705,33 @@ function CategoryChangeModal({
                     {transaction.is_from_merged_contact &&
                         transaction.original_contact && (
                             <p className="mt-1 text-xs text-muted-foreground">
-                                Transação importada como {transaction.original_contact.name}
+                                Transação importada como{' '}
+                                {transaction.original_contact.name}
                             </p>
                         )}
 
                     <p
-                        className={`mt-2 text-sm font-semibold ${transaction.amount >= 0 ? "text-green-600" : "text-red-600"
-                            }`}
+                        className={`mt-2 text-sm font-semibold ${
+                            transaction.amount >= 0
+                                ? 'text-green-600'
+                                : 'text-red-600'
+                        }`}
                     >
                         {formatCurrency(transaction.amount)}
                     </p>
                 </div>
 
                 <form onSubmit={submit} className="space-y-5 p-5">
-                    <FilterField label="Nova categoria" htmlFor="category_id_modal">
+                    <FilterField
+                        label="Nova categoria"
+                        htmlFor="category_id_modal"
+                    >
                         <select
                             id="category_id_modal"
                             value={categoryId}
-                            onChange={(event) => setCategoryId(event.target.value)}
+                            onChange={(event) =>
+                                setCategoryId(event.target.value)
+                            }
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         >
                             <option value="">Selecione uma categoria</option>
@@ -701,7 +745,9 @@ function CategoryChangeModal({
                     </FilterField>
 
                     <fieldset className="space-y-3">
-                        <legend className="text-sm font-medium">Onde aplicar?</legend>
+                        <legend className="text-sm font-medium">
+                            Onde aplicar?
+                        </legend>
 
                         <ScopeOption
                             value="current"
@@ -747,7 +793,7 @@ function CategoryChangeModal({
                             disabled={isSubmitting || !categoryId}
                             className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {isSubmitting ? "Salvando..." : "Salvar alteração"}
+                            {isSubmitting ? 'Salvando...' : 'Salvar alteração'}
                         </button>
                     </div>
                 </form>
@@ -796,11 +842,13 @@ function ScopeOption({
 }) {
     return (
         <label
-            className={`flex gap-3 rounded-lg border p-4 transition-colors ${selectedValue === value ? "border-primary bg-primary/5" : ""
-                } ${disabled
-                    ? "cursor-not-allowed opacity-50"
-                    : "cursor-pointer hover:bg-muted/40"
-                }`}
+            className={`flex gap-3 rounded-lg border p-4 transition-colors ${
+                selectedValue === value ? 'border-primary bg-primary/5' : ''
+            } ${
+                disabled
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'cursor-pointer hover:bg-muted/40'
+            }`}
         >
             <input
                 type="radio"
@@ -831,7 +879,7 @@ function Pagination({ pagination }: { pagination: PaginatedTransactions }) {
     return (
         <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between md:px-6">
             <p className="text-sm text-muted-foreground">
-                Exibindo {pagination.from ?? 0} até {pagination.to ?? 0} de{" "}
+                Exibindo {pagination.from ?? 0} até {pagination.to ?? 0} de{' '}
                 {pagination.total}
             </p>
 
@@ -851,10 +899,11 @@ function Pagination({ pagination }: { pagination: PaginatedTransactions }) {
                                 preserveScroll: true,
                             });
                         }}
-                        className={`min-w-9 rounded-md border px-3 py-2 text-sm ${link.active
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-background hover:bg-muted"
-                            } disabled:cursor-not-allowed disabled:opacity-40`}
+                        className={`min-w-9 rounded-md border px-3 py-2 text-sm ${
+                            link.active
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-background hover:bg-muted'
+                        } disabled:cursor-not-allowed disabled:opacity-40`}
                         dangerouslySetInnerHTML={{
                             __html: link.label,
                         }}
@@ -877,13 +926,13 @@ function FeedbackMessage({
     type,
     message,
 }: {
-    type: "success" | "error";
+    type: 'success' | 'error';
     message: string;
 }) {
     const classes =
-        type === "success"
-            ? "border-green-200 bg-green-50 text-green-800"
-            : "border-red-200 bg-red-50 text-red-700";
+        type === 'success'
+            ? 'border-green-200 bg-green-50 text-green-800'
+            : 'border-red-200 bg-red-50 text-red-700';
 
     return (
         <div className={`rounded-md border px-4 py-3 text-sm ${classes}`}>
@@ -894,19 +943,19 @@ function FeedbackMessage({
 
 function compactFilters(filters: Filters): Partial<Filters> {
     return Object.fromEntries(
-        Object.entries(filters).filter(([, value]) => value !== ""),
+        Object.entries(filters).filter(([, value]) => value !== ''),
     ) as Partial<Filters>;
 }
 
 function formatCurrency(value: number): string {
-    return new Intl.NumberFormat("pt-BR", {
-        style: "currency",
-        currency: "BRL",
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
     }).format(value);
 }
 
 function formatDate(value: string): string {
-    const [year, month, day] = value.slice(0, 10).split("-");
+    const [year, month, day] = value.slice(0, 10).split('-');
 
     if (!year || !month || !day) {
         return value;
@@ -917,17 +966,17 @@ function formatDate(value: string): string {
 
 function formatBank(bank?: string | null): string {
     const banks: Record<string, string> = {
-        nubank: "Nubank",
-        inter: "Banco Inter",
-        santander: "Santander",
-        itau: "Itaú",
-        bradesco: "Bradesco",
-        caixa: "Caixa",
-        banco_do_brasil: "Banco do Brasil",
+        nubank: 'Nubank',
+        inter: 'Banco Inter',
+        santander: 'Santander',
+        itau: 'Itaú',
+        bradesco: 'Bradesco',
+        caixa: 'Caixa',
+        banco_do_brasil: 'Banco do Brasil',
     };
 
     if (!bank) {
-        return "Banco não identificado";
+        return 'Banco não identificado';
     }
 
     return banks[bank] ?? bank;
@@ -935,23 +984,23 @@ function formatBank(bank?: string | null): string {
 
 function formatMethod(method: string | null): string {
     const methods: Record<string, string> = {
-        pix: "Pix",
-        ted: "TED",
-        doc: "DOC",
-        boleto: "Boleto",
-        card: "Cartão",
-        debit_card: "Cartão de débito",
-        credit_card: "Cartão de crédito",
-        transferencia: "Transferência",
-        saque: "Saque",
-        deposito: "Depósito",
-        tarifa: "Tarifa",
-        outros: "Outros",
-        other: "Outro",
+        pix: 'Pix',
+        ted: 'TED',
+        doc: 'DOC',
+        boleto: 'Boleto',
+        card: 'Cartão',
+        debit_card: 'Cartão de débito',
+        credit_card: 'Cartão de crédito',
+        transferencia: 'Transferência',
+        saque: 'Saque',
+        deposito: 'Depósito',
+        tarifa: 'Tarifa',
+        outros: 'Outros',
+        other: 'Outro',
     };
 
     if (!method) {
-        return "Outro";
+        return 'Outro';
     }
 
     return methods[method] ?? method;

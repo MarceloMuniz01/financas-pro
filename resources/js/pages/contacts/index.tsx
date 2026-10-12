@@ -1,6 +1,7 @@
-import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useMemo, useState } from 'react';
+import AppLayout from '@/layouts/app-layout';
 
 type ContactType = 'company' | 'individual' | null;
 type EditableContactType = 'company' | 'individual' | '';
@@ -106,40 +107,28 @@ export default function ContactsIndex({
     const [search, setSearch] = useState(filters.search);
     const [contactType, setContactType] = useState(filters.contact_type);
 
-    const [editingContact, setEditingContact] =
-        useState<ContactItem | null>(null);
+    const [editingContact, setEditingContact] = useState<ContactItem | null>(
+        null,
+    );
 
     const [selectedContacts, setSelectedContacts] = useState<ContactItem[]>([]);
     const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
-    const [
-        unmergingContact,
-        setUnmergingContact,
-    ] = useState<ContactItem | null>(null);
-
-    useEffect(() => {
-        setSearch(filters.search);
-        setContactType(filters.contact_type);
-    }, [filters]);
-
-
+    const [unmergingContact, setUnmergingContact] =
+        useState<ContactItem | null>(null);
 
     const allPageContactsSelected =
-        contacts.data.length > 0
-        && contacts.data.every((contact) =>
-            isContactSelected(contact.id),
-        );
+        contacts.data.length > 0 &&
+        contacts.data.every((contact) => isContactSelected(contact.id));
 
     function toggleContactSelection(contact: ContactItem) {
         setSelectedContacts((current) => {
             const alreadySelected = current.some(
-                (selectedContact) =>
-                    selectedContact.id === contact.id,
+                (selectedContact) => selectedContact.id === contact.id,
             );
 
             if (alreadySelected) {
                 return current.filter(
-                    (selectedContact) =>
-                        selectedContact.id !== contact.id,
+                    (selectedContact) => selectedContact.id !== contact.id,
                 );
             }
 
@@ -155,28 +144,19 @@ export default function ContactsIndex({
 
             if (allPageContactsSelected) {
                 return current.filter(
-                    (contact) =>
-                        !currentPageIds.has(contact.id),
+                    (contact) => !currentPageIds.has(contact.id),
                 );
             }
 
             const selectedById = new Map(
-                current.map((contact) => [
-                    contact.id,
-                    contact,
-                ]),
+                current.map((contact) => [contact.id, contact]),
             );
 
             for (const contact of contacts.data) {
-                selectedById.set(
-                    contact.id,
-                    contact,
-                );
+                selectedById.set(contact.id, contact);
             }
 
-            return Array.from(
-                selectedById.values(),
-            );
+            return Array.from(selectedById.values());
         });
     }
 
@@ -217,9 +197,7 @@ export default function ContactsIndex({
     }
 
     function isContactSelected(contactId: number): boolean {
-        return selectedContacts.some(
-            (contact) => contact.id === contactId,
-        );
+        return selectedContacts.some((contact) => contact.id === contactId);
     }
 
     return (
@@ -228,13 +206,11 @@ export default function ContactsIndex({
 
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <header>
-                    <h1 className="text-2xl font-semibold">
-                        Contatos
-                    </h1>
+                    <h1 className="text-2xl font-semibold">Contatos</h1>
 
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Gerencie as contrapartes, apelidos e contatos
-                        que representam a mesma pessoa ou empresa.
+                        Gerencie as contrapartes, apelidos e contatos que
+                        representam a mesma pessoa ou empresa.
                     </p>
                 </header>
 
@@ -319,9 +295,7 @@ export default function ContactsIndex({
 
                 <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
                     <div className="border-b p-4 md:p-6">
-                        <h2 className="text-lg font-semibold">
-                            Contrapartes
-                        </h2>
+                        <h2 className="text-lg font-semibold">Contrapartes</h2>
 
                         <p className="mt-1 text-sm text-muted-foreground">
                             {contacts.total === 0
@@ -375,9 +349,7 @@ export default function ContactsIndex({
                                 <button
                                     type="button"
                                     disabled={selectedContacts.length < 2}
-                                    onClick={() =>
-                                        setIsMergeModalOpen(true)
-                                    }
+                                    onClick={() => setIsMergeModalOpen(true)}
                                     className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     Mesclar selecionados
@@ -388,8 +360,7 @@ export default function ContactsIndex({
 
                     {contacts.data.length === 0 ? (
                         <div className="p-8 text-center text-sm text-muted-foreground">
-                            Nenhum contato corresponde aos filtros
-                            selecionados.
+                            Nenhum contato corresponde aos filtros selecionados.
                         </div>
                     ) : (
                         <>
@@ -397,7 +368,7 @@ export default function ContactsIndex({
                                 <table className="w-full min-w-[1100px] text-left text-sm">
                                     <thead className="border-b bg-muted/50">
                                         <tr>
-                                            <th className="w-12 px-4 py-3 text-center md:pl-6 md:pr-2">
+                                            <th className="w-12 px-4 py-3 text-center md:pr-2 md:pl-6">
                                                 <input
                                                     type="checkbox"
                                                     aria-label="Selecionar todos os contatos"
@@ -443,13 +414,17 @@ export default function ContactsIndex({
                                                 key={contact.id}
                                                 className="border-b last:border-b-0 hover:bg-muted/30"
                                             >
-                                                <td className="w-12 px-4 py-4 text-center md:pl-6 md:pr-2">
+                                                <td className="w-12 px-4 py-4 text-center md:pr-2 md:pl-6">
                                                     <input
                                                         type="checkbox"
                                                         aria-label={`Selecionar ${contact.name}`}
-                                                        checked={isContactSelected(contact.id)}
+                                                        checked={isContactSelected(
+                                                            contact.id,
+                                                        )}
                                                         onChange={() =>
-                                                            toggleContactSelection(contact)
+                                                            toggleContactSelection(
+                                                                contact,
+                                                            )
                                                         }
                                                         className="h-4 w-4 rounded border"
                                                     />
@@ -466,53 +441,56 @@ export default function ContactsIndex({
                                                         )}
                                                     </div>
 
-                                                    {contact.aliases.length
-                                                        > 0 && (
-                                                            <div className="mt-2 flex flex-wrap gap-1">
-                                                                {contact.aliases
-                                                                    .slice(0, 3)
-                                                                    .map(
-                                                                        (
-                                                                            alias,
-                                                                        ) => (
-                                                                            <span
-                                                                                key={
-                                                                                    alias.id
-                                                                                }
-                                                                                className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
-                                                                            >
-                                                                                {
-                                                                                    alias.name
-                                                                                }
-                                                                            </span>
-                                                                        ),
-                                                                    )}
-
-                                                                {contact.aliases
-                                                                    .length
-                                                                    > 3 && (
-                                                                        <span className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
-                                                                            +
-                                                                            {contact
-                                                                                .aliases
-                                                                                .length
-                                                                                - 3}
+                                                    {contact.aliases.length >
+                                                        0 && (
+                                                        <div className="mt-2 flex flex-wrap gap-1">
+                                                            {contact.aliases
+                                                                .slice(0, 3)
+                                                                .map(
+                                                                    (alias) => (
+                                                                        <span
+                                                                            key={
+                                                                                alias.id
+                                                                            }
+                                                                            className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
+                                                                        >
+                                                                            {
+                                                                                alias.name
+                                                                            }
                                                                         </span>
-                                                                    )}
-                                                            </div>
-                                                        )}
+                                                                    ),
+                                                                )}
 
-                                                    {contact.linked_contacts_count > 0 && (
+                                                            {contact.aliases
+                                                                .length > 3 && (
+                                                                <span className="rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                                    +
+                                                                    {contact
+                                                                        .aliases
+                                                                        .length -
+                                                                        3}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {contact.linked_contacts_count >
+                                                        0 && (
                                                         <div className="mt-2">
                                                             <button
                                                                 type="button"
                                                                 onClick={() =>
-                                                                    setUnmergingContact(contact)
+                                                                    setUnmergingContact(
+                                                                        contact,
+                                                                    )
                                                                 }
                                                                 className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
                                                             >
-                                                                {contact.linked_contacts_count}{' '}
-                                                                {contact.linked_contacts_count === 1
+                                                                {
+                                                                    contact.linked_contacts_count
+                                                                }{' '}
+                                                                {contact.linked_contacts_count ===
+                                                                1
                                                                     ? 'contato mesclado'
                                                                     : 'contatos mesclados'}
                                                             </button>
@@ -557,9 +535,7 @@ export default function ContactsIndex({
                                                 </td>
 
                                                 <td className="px-4 py-4 text-center md:px-6">
-                                                    {
-                                                        contact.transactions_count
-                                                    }
+                                                    {contact.transactions_count}
                                                 </td>
 
                                                 <td className="px-4 py-4 text-right md:px-6">
@@ -609,12 +585,9 @@ export default function ContactsIndex({
             {unmergingContact && (
                 <UnmergeContactsModal
                     contact={unmergingContact}
-                    onClose={() =>
-                        setUnmergingContact(null)
-                    }
+                    onClose={() => setUnmergingContact(null)}
                 />
             )}
-
         </AppLayout>
     );
 }
@@ -632,25 +605,21 @@ function MergeContactsModal({
         () =>
             [...contacts].sort(
                 (first, second) =>
-                    getContactScore(second)
-                    - getContactScore(first),
+                    getContactScore(second) - getContactScore(first),
             )[0],
         [contacts],
     );
 
-    const [targetContactId, setTargetContactId] =
-        useState<number>(
-            recommendedTarget?.id
-            ?? contacts[0]?.id,
-        );
+    const [targetContactId, setTargetContactId] = useState<number>(
+        recommendedTarget?.id ?? contacts[0]?.id,
+    );
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const targetContact =
-        contacts.find(
-            (contact) => contact.id === targetContactId,
-        ) ?? contacts[0];
+        contacts.find((contact) => contact.id === targetContactId) ??
+        contacts[0];
 
     const sourceContacts = contacts.filter(
         (contact) => contact.id !== targetContact?.id,
@@ -661,16 +630,14 @@ function MergeContactsModal({
             contacts
                 .map((contact) => contact.contact_type)
                 .filter(
-                    (
-                        type,
-                    ): type is Exclude<ContactType, null> =>
-                        type !== null,
+                    (type): type is Exclude<ContactType, null> => type !== null,
                 ),
         ).size > 1;
 
     function handleMerge() {
         if (!targetContact) {
             setError('Selecione o contato principal.');
+
             return;
         }
 
@@ -688,9 +655,7 @@ function MergeContactsModal({
         router.post(
             '/contacts/merge-many',
             {
-                contact_ids: contacts.map(
-                    (contact) => contact.id,
-                ),
+                contact_ids: contacts.map((contact) => contact.id),
 
                 target_contact_id: targetContact.id,
             },
@@ -701,10 +666,10 @@ function MergeContactsModal({
 
                 onError: (errors) => {
                     setError(
-                        errors.contact_ids
-                        || errors.target_contact_id
-                        || errors.contact_type
-                        || 'Não foi possível mesclar os contatos.',
+                        errors.contact_ids ||
+                            errors.target_contact_id ||
+                            errors.contact_type ||
+                            'Não foi possível mesclar os contatos.',
                     );
                 },
 
@@ -719,24 +684,18 @@ function MergeContactsModal({
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
             onMouseDown={(event) => {
-                if (
-                    event.target === event.currentTarget
-                    && !isSubmitting
-                ) {
+                if (event.target === event.currentTarget && !isSubmitting) {
                     onClose();
                 }
             }}
         >
             <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border bg-background shadow-xl">
                 <div className="border-b p-5">
-                    <h2 className="text-lg font-semibold">
-                        Mesclar contatos
-                    </h2>
+                    <h2 className="text-lg font-semibold">Mesclar contatos</h2>
 
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Escolha o contato principal. Os demais serão
-                        vinculados a ele, sem excluir contatos ou mover
-                        transações.
+                        Escolha o contato principal. Os demais serão vinculados
+                        a ele, sem excluir contatos ou mover transações.
                     </p>
                 </div>
 
@@ -754,20 +713,19 @@ function MergeContactsModal({
 
                         <div className="grid gap-3 md:grid-cols-2">
                             {contacts.map((contact) => {
-                                const selected =
-                                    contact.id === targetContactId;
+                                const selected = contact.id === targetContactId;
 
                                 const recommended =
-                                    contact.id
-                                    === recommendedTarget?.id;
+                                    contact.id === recommendedTarget?.id;
 
                                 return (
                                     <label
                                         key={contact.id}
-                                        className={`cursor-pointer rounded-xl border p-4 ${selected
-                                            ? 'border-primary bg-primary/5'
-                                            : 'hover:bg-muted/40'
-                                            }`}
+                                        className={`cursor-pointer rounded-xl border p-4 ${
+                                            selected
+                                                ? 'border-primary bg-primary/5'
+                                                : 'hover:bg-muted/40'
+                                        }`}
                                     >
                                         <div className="flex items-start gap-3">
                                             <input
@@ -837,9 +795,7 @@ function MergeContactsModal({
 
                     {targetContact && (
                         <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-                            <p className="font-medium">
-                                Resultado
-                            </p>
+                            <p className="font-medium">Resultado</p>
 
                             <ul className="mt-2 space-y-1 text-muted-foreground">
                                 <li>
@@ -863,13 +819,13 @@ function MergeContactsModal({
                                 </li>
 
                                 <li>
-                                    A contagem de transações será exibida
-                                    como um único total.
+                                    A contagem de transações será exibida como
+                                    um único total.
                                 </li>
 
                                 <li>
-                                    As categorias do principal serão usadas
-                                    por todo o grupo.
+                                    As categorias do principal serão usadas por
+                                    todo o grupo.
                                 </li>
                             </ul>
                         </div>
@@ -895,9 +851,9 @@ function MergeContactsModal({
                             type="button"
                             onClick={handleMerge}
                             disabled={
-                                isSubmitting
-                                || hasIncompatibleTypes
-                                || !targetContact
+                                isSubmitting ||
+                                hasIncompatibleTypes ||
+                                !targetContact
                             }
                             className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -919,44 +875,23 @@ function UnmergeContactsModal({
     contact: ContactItem;
     onClose: () => void;
 }) {
-    const [
-        selectedContactIds,
-        setSelectedContactIds,
-    ] = useState<number[]>([]);
+    const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
 
-    const [
-        isSubmitting,
-        setIsSubmitting,
-    ] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const [
-        error,
-        setError,
-    ] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const allSelected =
-        contact.linked_contacts.length > 0
-        && contact.linked_contacts.every(
-            (linkedContact) =>
-                selectedContactIds.includes(
-                    linkedContact.id,
-                ),
+        contact.linked_contacts.length > 0 &&
+        contact.linked_contacts.every((linkedContact) =>
+            selectedContactIds.includes(linkedContact.id),
         );
 
-    function toggleContact(
-        contactId: number,
-    ) {
-        setSelectedContactIds(
-            (current) =>
-                current.includes(contactId)
-                    ? current.filter(
-                        (id) =>
-                            id !== contactId,
-                    )
-                    : [
-                        ...current,
-                        contactId,
-                    ],
+    function toggleContact(contactId: number) {
+        setSelectedContactIds((current) =>
+            current.includes(contactId)
+                ? current.filter((id) => id !== contactId)
+                : [...current, contactId],
         );
 
         setError(null);
@@ -965,25 +900,18 @@ function UnmergeContactsModal({
     function toggleAll() {
         if (allSelected) {
             setSelectedContactIds([]);
+
             return;
         }
 
         setSelectedContactIds(
-            contact.linked_contacts.map(
-                (linkedContact) =>
-                    linkedContact.id,
-            ),
+            contact.linked_contacts.map((linkedContact) => linkedContact.id),
         );
     }
 
     function handleUnmerge() {
-        if (
-            selectedContactIds.length
-            === 0
-        ) {
-            setError(
-                'Selecione pelo menos um contato para desmesclar.',
-            );
+        if (selectedContactIds.length === 0) {
+            setError('Selecione pelo menos um contato para desmesclar.');
 
             return;
         }
@@ -994,11 +922,9 @@ function UnmergeContactsModal({
         router.post(
             '/contacts/unmerge-many',
             {
-                main_contact_id:
-                    contact.id,
+                main_contact_id: contact.id,
 
-                contact_ids:
-                    selectedContactIds,
+                contact_ids: selectedContactIds,
             },
             {
                 preserveScroll: true,
@@ -1009,17 +935,15 @@ function UnmergeContactsModal({
 
                 onError: (errors) => {
                     setError(
-                        errors.contact_ids
-                        || errors.main_contact_id
-                        || errors.contacts
-                        || 'Não foi possível desmesclar os contatos.',
+                        errors.contact_ids ||
+                            errors.main_contact_id ||
+                            errors.contacts ||
+                            'Não foi possível desmesclar os contatos.',
                     );
                 },
 
                 onFinish: () => {
-                    setIsSubmitting(
-                        false,
-                    );
+                    setIsSubmitting(false);
                 },
             },
         );
@@ -1029,11 +953,7 @@ function UnmergeContactsModal({
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
             onMouseDown={(event) => {
-                if (
-                    event.target
-                    === event.currentTarget
-                    && !isSubmitting
-                ) {
+                if (event.target === event.currentTarget && !isSubmitting) {
                     onClose();
                 }
             }}
@@ -1045,8 +965,7 @@ function UnmergeContactsModal({
                     </h2>
 
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Selecione os contatos que
-                        devem ser separados de{' '}
+                        Selecione os contatos que devem ser separados de{' '}
                         <strong className="text-foreground">
                             {contact.name}
                         </strong>
@@ -1058,12 +977,8 @@ function UnmergeContactsModal({
                     <label className="flex cursor-pointer items-center gap-3 rounded-lg border bg-muted/30 p-3">
                         <input
                             type="checkbox"
-                            checked={
-                                allSelected
-                            }
-                            onChange={
-                                toggleAll
-                            }
+                            checked={allSelected}
+                            onChange={toggleAll}
                             className="h-4 w-4 rounded border"
                         />
 
@@ -1081,10 +996,11 @@ function UnmergeContactsModal({
                             return (
                                 <label
                                     key={linkedContact.id}
-                                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${selected
+                                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
+                                        selected
                                             ? 'border-primary bg-primary/5'
                                             : 'hover:bg-muted/40'
-                                        }`}
+                                    }`}
                                 >
                                     <input
                                         type="checkbox"
@@ -1114,8 +1030,11 @@ function UnmergeContactsModal({
                                             </span>
 
                                             <span>
-                                                {linkedContact.transactions_count}{' '}
-                                                {linkedContact.transactions_count === 1
+                                                {
+                                                    linkedContact.transactions_count
+                                                }{' '}
+                                                {linkedContact.transactions_count ===
+                                                1
                                                     ? 'transação'
                                                     : 'transações'}
                                             </span>
@@ -1127,9 +1046,8 @@ function UnmergeContactsModal({
                     </div>
 
                     <div className="rounded-md border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                        Ao desmesclar, as transações,
-                        categorias e apelidos dos contatos
-                        serão desassociados de {' '}
+                        Ao desmesclar, as transações, categorias e apelidos dos
+                        contatos serão desassociados de{' '}
                         <strong className="text-foreground">
                             {contact.name}
                         </strong>
@@ -1145,9 +1063,7 @@ function UnmergeContactsModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            disabled={
-                                isSubmitting
-                            }
+                            disabled={isSubmitting}
                             className="h-10 rounded-md border px-4 text-sm font-medium disabled:opacity-50"
                         >
                             Cancelar
@@ -1155,22 +1071,17 @@ function UnmergeContactsModal({
 
                         <button
                             type="button"
-                            onClick={
-                                handleUnmerge
-                            }
+                            onClick={handleUnmerge}
                             disabled={
-                                isSubmitting
-                                || selectedContactIds.length
-                                === 0
+                                isSubmitting || selectedContactIds.length === 0
                             }
                             className="h-10 rounded-md bg-red-600 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {isSubmitting
                                 ? 'Desmesclando...'
-                                : selectedContactIds.length
-                                    === 1
-                                    ? 'Desmesclar contato'
-                                    : `Desmesclar ${selectedContactIds.length} contatos`}
+                                : selectedContactIds.length === 1
+                                  ? 'Desmesclar contato'
+                                  : `Desmesclar ${selectedContactIds.length} contatos`}
                         </button>
                     </div>
                 </div>
@@ -1189,46 +1100,32 @@ function ContactEditModal({
     onClose: () => void;
 }) {
     const expenseCategories = useMemo(
-        () =>
-            categories.filter(
-                (category) => category.type === 'expense',
-            ),
+        () => categories.filter((category) => category.type === 'expense'),
         [categories],
     );
 
     const incomeCategories = useMemo(
-        () =>
-            categories.filter(
-                (category) => category.type === 'income',
-            ),
+        () => categories.filter((category) => category.type === 'income'),
         [categories],
     );
 
     const [name, setName] = useState(contact.name);
 
-    const [contactType, setContactType] =
-        useState<EditableContactType>(
-            contact.contact_type ?? '',
-        );
-
-    const [document, setDocument] = useState(
-        getEditableDocument(
-            contact.document,
-            contact.contact_type,
-        ),
+    const [contactType, setContactType] = useState<EditableContactType>(
+        contact.contact_type ?? '',
     );
 
-    const [expenseCategoryId, setExpenseCategoryId] =
-        useState(
-            contact.default_expense_category_id?.toString()
-            ?? '',
-        );
+    const [document, setDocument] = useState(
+        getEditableDocument(contact.document, contact.contact_type),
+    );
 
-    const [incomeCategoryId, setIncomeCategoryId] =
-        useState(
-            contact.default_income_category_id?.toString()
-            ?? '',
-        );
+    const [expenseCategoryId, setExpenseCategoryId] = useState(
+        contact.default_expense_category_id?.toString() ?? '',
+    );
+
+    const [incomeCategoryId, setIncomeCategoryId] = useState(
+        contact.default_income_category_id?.toString() ?? '',
+    );
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -1243,16 +1140,9 @@ function ContactEditModal({
     }
 
     function handleDocumentChange(value: string) {
-        const maximumLength =
-            contactType === 'company'
-                ? 14
-                : 11;
+        const maximumLength = contactType === 'company' ? 14 : 11;
 
-        setDocument(
-            value
-                .replace(/\D/g, '')
-                .slice(0, maximumLength),
-        );
+        setDocument(value.replace(/\D/g, '').slice(0, maximumLength));
 
         setError(null);
     }
@@ -1264,17 +1154,15 @@ function ContactEditModal({
 
         if (!normalizedName) {
             setError('Informe o nome do contato.');
+
             return;
         }
 
-        const documentError =
-            validateDocumentOnClient(
-                document,
-                contactType,
-            );
+        const documentError = validateDocumentOnClient(document, contactType);
 
         if (documentError) {
             setError(documentError);
+
             return;
         }
 
@@ -1288,15 +1176,13 @@ function ContactEditModal({
                 document: document || null,
                 contact_type: contactType || null,
 
-                default_expense_category_id:
-                    expenseCategoryId
-                        ? Number(expenseCategoryId)
-                        : null,
+                default_expense_category_id: expenseCategoryId
+                    ? Number(expenseCategoryId)
+                    : null,
 
-                default_income_category_id:
-                    incomeCategoryId
-                        ? Number(incomeCategoryId)
-                        : null,
+                default_income_category_id: incomeCategoryId
+                    ? Number(incomeCategoryId)
+                    : null,
             },
             {
                 preserveScroll: true,
@@ -1305,12 +1191,12 @@ function ContactEditModal({
 
                 onError: (errors) => {
                     setError(
-                        errors.name
-                        || errors.document
-                        || errors.contact_type
-                        || errors.default_expense_category_id
-                        || errors.default_income_category_id
-                        || 'Não foi possível atualizar o contato.',
+                        errors.name ||
+                            errors.document ||
+                            errors.contact_type ||
+                            errors.default_expense_category_id ||
+                            errors.default_income_category_id ||
+                            'Não foi possível atualizar o contato.',
                     );
                 },
 
@@ -1325,38 +1211,28 @@ function ContactEditModal({
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
             onMouseDown={(event) => {
-                if (
-                    event.target === event.currentTarget
-                    && !isSubmitting
-                ) {
+                if (event.target === event.currentTarget && !isSubmitting) {
                     onClose();
                 }
             }}
         >
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border bg-background shadow-xl">
                 <div className="border-b p-5">
-                    <h2 className="text-lg font-semibold">
-                        Editar contato
-                    </h2>
+                    <h2 className="text-lg font-semibold">Editar contato</h2>
 
                     <p className="mt-1 text-sm text-muted-foreground">
                         Atualize os dados e as categorias padrão.
                     </p>
                 </div>
 
-                <form
-                    onSubmit={handleSubmit}
-                    className="space-y-5 p-5"
-                >
+                <form onSubmit={handleSubmit} className="space-y-5 p-5">
                     <FormField label="Nome" htmlFor="contact_name">
                         <input
                             id="contact_name"
                             type="text"
                             value={name}
                             maxLength={255}
-                            onChange={(event) =>
-                                setName(event.target.value)
-                            }
+                            onChange={(event) => setName(event.target.value)}
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         />
                     </FormField>
@@ -1370,8 +1246,7 @@ function ContactEditModal({
                             value={contactType}
                             onChange={(event) =>
                                 handleTypeChange(
-                                    event.target
-                                        .value as EditableContactType,
+                                    event.target.value as EditableContactType,
                                 )
                             }
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
@@ -1390,19 +1265,12 @@ function ContactEditModal({
                             id="contact_document"
                             type="text"
                             inputMode="numeric"
-                            value={formatDocumentInput(
-                                document,
-                                contactType,
-                            )}
+                            value={formatDocumentInput(document, contactType)}
                             disabled={!contactType}
                             onChange={(event) =>
-                                handleDocumentChange(
-                                    event.target.value,
-                                )
+                                handleDocumentChange(event.target.value)
                             }
-                            placeholder={getDocumentPlaceholder(
-                                contactType,
-                            )}
+                            placeholder={getDocumentPlaceholder(contactType)}
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                         />
 
@@ -1419,19 +1287,14 @@ function ContactEditModal({
                             id="default_expense_category_id"
                             value={expenseCategoryId}
                             onChange={(event) =>
-                                setExpenseCategoryId(
-                                    event.target.value,
-                                )
+                                setExpenseCategoryId(event.target.value)
                             }
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         >
                             <option value="">Não definida</option>
 
                             {expenseCategories.map((category) => (
-                                <option
-                                    key={category.id}
-                                    value={category.id}
-                                >
+                                <option key={category.id} value={category.id}>
                                     {category.name}
                                 </option>
                             ))}
@@ -1446,19 +1309,14 @@ function ContactEditModal({
                             id="default_income_category_id"
                             value={incomeCategoryId}
                             onChange={(event) =>
-                                setIncomeCategoryId(
-                                    event.target.value,
-                                )
+                                setIncomeCategoryId(event.target.value)
                             }
                             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         >
                             <option value="">Não definida</option>
 
                             {incomeCategories.map((category) => (
-                                <option
-                                    key={category.id}
-                                    value={category.id}
-                                >
+                                <option key={category.id} value={category.id}>
                                     {category.name}
                                 </option>
                             ))}
@@ -1486,9 +1344,7 @@ function ContactEditModal({
                             disabled={isSubmitting || !name.trim()}
                             className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
                         >
-                            {isSubmitting
-                                ? 'Salvando...'
-                                : 'Salvar alterações'}
+                            {isSubmitting ? 'Salvando...' : 'Salvar alterações'}
                         </button>
                     </div>
                 </form>
@@ -1520,31 +1376,17 @@ function FormField({
     );
 }
 
-function InfoRow({
-    label,
-    value,
-}: {
-    label: string;
-    value: string;
-}) {
+function InfoRow({ label, value }: { label: string; value: string }) {
     return (
         <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">
-                {label}
-            </dt>
+            <dt className="text-muted-foreground">{label}</dt>
 
-            <dd className="text-right font-medium">
-                {value}
-            </dd>
+            <dd className="text-right font-medium">{value}</dd>
         </div>
     );
 }
 
-function ContactTypeBadge({
-    type,
-}: {
-    type: ContactType;
-}) {
+function ContactTypeBadge({ type }: { type: ContactType }) {
     if (type === 'company') {
         return (
             <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-800">
@@ -1568,11 +1410,7 @@ function ContactTypeBadge({
     );
 }
 
-function CategoryBadge({
-    category,
-}: {
-    category: CategoryItem;
-}) {
+function CategoryBadge({ category }: { category: CategoryItem }) {
     return (
         <span className="inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium">
             <span
@@ -1587,11 +1425,7 @@ function CategoryBadge({
     );
 }
 
-function Pagination({
-    contacts,
-}: {
-    contacts: PaginatedContacts;
-}) {
+function Pagination({ contacts }: { contacts: PaginatedContacts }) {
     if (contacts.last_page <= 1) {
         return null;
     }
@@ -1599,8 +1433,8 @@ function Pagination({
     return (
         <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between md:px-6">
             <p className="text-sm text-muted-foreground">
-                Exibindo {contacts.from ?? 0} até{' '}
-                {contacts.to ?? 0} de {contacts.total}
+                Exibindo {contacts.from ?? 0} até {contacts.to ?? 0} de{' '}
+                {contacts.total}
             </p>
 
             <div className="flex flex-wrap gap-1">
@@ -1619,10 +1453,11 @@ function Pagination({
                                 preserveScroll: true,
                             });
                         }}
-                        className={`min-w-9 rounded-md border px-3 py-2 text-sm ${link.active
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-background hover:bg-muted'
-                            } disabled:cursor-not-allowed disabled:opacity-40`}
+                        className={`min-w-9 rounded-md border px-3 py-2 text-sm ${
+                            link.active
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-background hover:bg-muted'
+                        } disabled:cursor-not-allowed disabled:opacity-40`}
                         dangerouslySetInnerHTML={{
                             __html: link.label,
                         }}
@@ -1665,17 +1500,11 @@ function getEditableDocument(
         return '';
     }
 
-    if (
-        contactType === 'individual'
-        && /^\d{11}$/.test(document)
-    ) {
+    if (contactType === 'individual' && /^\d{11}$/.test(document)) {
         return document;
     }
 
-    if (
-        contactType === 'company'
-        && /^\d{14}$/.test(document)
-    ) {
+    if (contactType === 'company' && /^\d{14}$/.test(document)) {
         return document;
     }
 
@@ -1694,17 +1523,11 @@ function validateDocumentOnClient(
         return 'Selecione o tipo do contato antes de informar o documento.';
     }
 
-    if (
-        contactType === 'individual'
-        && document.length !== 11
-    ) {
+    if (contactType === 'individual' && document.length !== 11) {
         return 'Informe um CPF completo com 11 dígitos.';
     }
 
-    if (
-        contactType === 'company'
-        && document.length !== 14
-    ) {
+    if (contactType === 'company' && document.length !== 14) {
         return 'Informe um CNPJ completo com 14 dígitos.';
     }
 
@@ -1723,9 +1546,7 @@ function getDocumentLabel(contactType: EditableContactType) {
     return 'Documento';
 }
 
-function getDocumentPlaceholder(
-    contactType: EditableContactType,
-) {
+function getDocumentPlaceholder(contactType: EditableContactType) {
     if (contactType === 'company') {
         return '00.000.000/0000-00';
     }
@@ -1758,32 +1579,17 @@ function formatDocumentInput(
     if (contactType === 'individual') {
         return digits
             .replace(/^(\d{3})(\d)/, '$1.$2')
-            .replace(
-                /^(\d{3})\.(\d{3})(\d)/,
-                '$1.$2.$3',
-            )
-            .replace(
-                /^(\d{3})\.(\d{3})\.(\d{3})(\d)/,
-                '$1.$2.$3-$4',
-            )
+            .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+            .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4')
             .slice(0, 14);
     }
 
     if (contactType === 'company') {
         return digits
             .replace(/^(\d{2})(\d)/, '$1.$2')
-            .replace(
-                /^(\d{2})\.(\d{3})(\d)/,
-                '$1.$2.$3',
-            )
-            .replace(
-                /^(\d{2})\.(\d{3})\.(\d{3})(\d)/,
-                '$1.$2.$3/$4',
-            )
-            .replace(
-                /(\d{4})(\d{1,2})$/,
-                '$1-$2',
-            )
+            .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+            .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4')
+            .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
             .slice(0, 18);
     }
 

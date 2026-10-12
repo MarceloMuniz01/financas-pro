@@ -9,13 +9,14 @@ class NubankParser implements BankParserInterface
     /**
      * Processa o CSV do Nubank utilizando stream.
      *
-     * @param resource $stream
+     * @param  resource  $stream
+     * @return iterable<array<string, mixed>>
      */
     public function parse($stream): iterable
     {
         $header = fgetcsv($stream);
 
-        if (!$header) {
+        if (! $header) {
             return;
         }
 
@@ -44,10 +45,6 @@ class NubankParser implements BankParserInterface
             }
 
             $row = array_combine($header, $rowValues);
-
-            if ($row === false) {
-                continue;
-            }
 
             $description = trim((string) ($row['Descrição'] ?? ''));
 
@@ -91,6 +88,13 @@ class NubankParser implements BankParserInterface
 
     /**
      * Extrai nome, documento, tipo do contato e método da transação.
+     *
+     * @return array{
+     *     counterparty_name: string|null,
+     *     counterparty_document: string|null,
+     *     counterparty_contact_type: string|null,
+     *     transaction_method: string
+     * }
      */
     public function parseDescription(string $description): array
     {

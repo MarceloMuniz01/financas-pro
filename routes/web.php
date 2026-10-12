@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ImportPageController;
@@ -31,10 +32,9 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::inertia(
-        '/dashboard',
-        'dashboard'
-    )->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware(['auth', 'verified'])
+        ->name('dashboard');
 
     /*
     |--------------------------------------------------------------------------
@@ -115,7 +115,6 @@ Route::middleware([
         ->whereNumber('contact')
         ->name('contacts.update');
 });
-
 
 /*
 |--------------------------------------------------------------------------

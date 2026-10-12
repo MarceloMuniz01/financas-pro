@@ -8,17 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Import extends Model
 {
     protected $fillable = [
-    'user_id',
-    'source',
-    'filename',
-    'original_filename',
-    'file_hash',
-    'bank',
-    'status',
-    'error_message',
-    'processed_at',
-    'error_message',
-];
+        'user_id',
+        'source',
+        'filename',
+        'original_filename',
+        'file_hash',
+        'bank',
+        'status',
+        'error_message',
+        'processed_at',
+    ];
 
     protected function casts(): array
     {
@@ -27,6 +26,9 @@ class Import extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 class StringMatchCategorizer
 {
     private const EXPENSE_FALLBACK_ID = 1;
+
     private const INCOME_FALLBACK_ID = 8;
 
     /**
@@ -19,8 +20,10 @@ class StringMatchCategorizer
      */
     private const STRICT_KEYWORD_MAX_LENGTH = 5;
 
+    /** @var Collection<int, Category> */
     private Collection $userCategories;
 
+    /** @var Collection<int, Category> */
     private Collection $globalCategories;
 
     public function __construct(
@@ -137,6 +140,8 @@ class StringMatchCategorizer
     /**
      * Percorre as categorias e retorna o ID da primeira
      * categoria cuja keyword corresponda ao nome.
+     *
+     * @param  Collection<int, Category>  $categories
      */
     private function matchCategory(
         string $name,
@@ -213,8 +218,8 @@ class StringMatchCategorizer
         );
 
         $pattern = '/(?<![\pL\pN])'
-            . $escapedKeyword
-            . '(?![\pL\pN])/u';
+            .$escapedKeyword
+            .'(?![\pL\pN])/u';
 
         return preg_match($pattern, $name) === 1;
     }
@@ -229,6 +234,8 @@ class StringMatchCategorizer
      * ou:
      *
      * UBER,POSTO,SHELL
+     *
+     * @return list<string>
      */
     private function parseKeywords(?string $keywords): array
     {
@@ -293,19 +300,53 @@ class StringMatchCategorizer
 
         $value = str_replace(
             [
-                'Á', 'À', 'Â', 'Ã', 'Ä',
-                'É', 'È', 'Ê', 'Ë',
-                'Í', 'Ì', 'Î', 'Ï',
-                'Ó', 'Ò', 'Ô', 'Õ', 'Ö',
-                'Ú', 'Ù', 'Û', 'Ü',
+                'Á',
+                'À',
+                'Â',
+                'Ã',
+                'Ä',
+                'É',
+                'È',
+                'Ê',
+                'Ë',
+                'Í',
+                'Ì',
+                'Î',
+                'Ï',
+                'Ó',
+                'Ò',
+                'Ô',
+                'Õ',
+                'Ö',
+                'Ú',
+                'Ù',
+                'Û',
+                'Ü',
                 'Ç',
             ],
             [
-                'A', 'A', 'A', 'A', 'A',
-                'E', 'E', 'E', 'E',
-                'I', 'I', 'I', 'I',
-                'O', 'O', 'O', 'O', 'O',
-                'U', 'U', 'U', 'U',
+                'A',
+                'A',
+                'A',
+                'A',
+                'A',
+                'E',
+                'E',
+                'E',
+                'E',
+                'I',
+                'I',
+                'I',
+                'I',
+                'O',
+                'O',
+                'O',
+                'O',
+                'O',
+                'U',
+                'U',
+                'U',
+                'U',
                 'C',
             ],
             $value

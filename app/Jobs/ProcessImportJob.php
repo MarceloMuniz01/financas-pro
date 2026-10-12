@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use stdClass;
 use Throwable;
 
 class ProcessImportJob
@@ -41,8 +42,7 @@ class ProcessImportJob
 
     public function __construct(
         public Import $import
-    ) {
-    }
+    ) {}
 
     public function handle(): void
     {
@@ -53,7 +53,7 @@ class ProcessImportJob
          * Isso aumenta somente o limite do PHP. A infraestrutura
          * do Laravel Cloud ainda pode possuir timeout próprio.
          */
-        set_time_limit(300);
+        // set_time_limit(300); // agora estamos na AWS
 
         $startedAt = microtime(true);
         $stream = null;
@@ -75,7 +75,7 @@ class ProcessImportJob
                 $this->import->filename
             );
 
-            if (!is_resource($stream)) {
+            if (! is_resource($stream)) {
                 throw new RuntimeException(
                     "Não foi possível abrir o arquivo {$this->import->filename}."
                 );
@@ -88,18 +88,6 @@ class ProcessImportJob
 */
 
             $detectionStartedAt = microtime(true);
-
-            $fileContent = stream_get_contents($stream);
-
-            if ($fileContent === false) {
-                throw new RuntimeException(
-                    'Não foi possível ler o conteúdo do arquivo.'
-                );
-            }
-
-            $bankDetector = app(
-                BankDetector::class
-            );
 
             $bank = app(BankDetector::class)
                 ->detect($stream);
@@ -153,21 +141,19 @@ class ProcessImportJob
 
             $cacheStartedAt = microtime(true);
 
-            $contactCache =
-                $this->loadContactCache();
+            /** @var array<string, array<string, mixed>> $contactCache */
+            $contactCache = $this->loadContactCache();
 
-            $aliasCache =
-                $this->loadAliasCache();
+            /** @var array<string, array<string, mixed>> $aliasCache */
+            $aliasCache = $this->loadAliasCache();
 
             $this->logStep(
                 step: 'load_caches',
                 startedAt: $cacheStartedAt,
                 extra: [
-                    'contacts_loaded' =>
-                        count($contactCache),
+                    'contacts_loaded' => count($contactCache),
 
-                    'aliases_loaded' =>
-                        count($aliasCache),
+                    'aliases_loaded' => count($aliasCache),
                 ]
             );
 
@@ -177,8 +163,13 @@ class ProcessImportJob
             |--------------------------------------------------------------------------
             */
 
+            /** @var array<string, array<string, mixed>> $pendingContacts */
             $pendingContacts = [];
+
+            /** @var array<int, array<string, mixed>> $pendingTransactions */
             $pendingTransactions = [];
+
+            /** @var array<int, array<string, mixed>> $transactionBatch */
             $transactionBatch = [];
 
             $processedTransactions = 0;
@@ -195,8 +186,7 @@ class ProcessImportJob
             $parseStartedAt = microtime(true);
 
             foreach (
-                $parser->parse($stream)
-                as $transaction
+                $parser->parse($stream) as $transaction
             ) {
                 $processedTransactions++;
 
@@ -249,8 +239,7 @@ class ProcessImportJob
                         transaction: $transaction,
                         contact: $contact,
                         categorizer: $categorizer,
-                        transactionBatch:
-                        $transactionBatch,
+                        transactionBatch: $transactionBatch,
                         now: $now
                     );
 
@@ -270,20 +259,18 @@ class ProcessImportJob
                  * O contato ainda não existe.
                  */
                 $wasNewPendingContact =
-                    !isset(
-                    $pendingContacts[
-                        $normalizedName
-                    ]
-                );
+                    ! isset(
+                        $pendingContacts[
+                            $normalizedName
+                        ]
+                    );
 
                 $this->queueContact(
                     visibleName: $visibleName,
-                    normalizedName:
-                    $normalizedName,
+                    normalizedName: $normalizedName,
                     transaction: $transaction,
                     categorizer: $categorizer,
-                    pendingContacts:
-                    $pendingContacts,
+                    pendingContacts: $pendingContacts,
                     now: $now
                 );
 
@@ -296,14 +283,11 @@ class ProcessImportJob
                  * e receber um ID.
                  */
                 $pendingTransactions[] = [
-                    'transaction' =>
-                        $transaction,
+                    'transaction' => $transaction,
 
-                    'normalized_name' =>
-                        $normalizedName,
+                    'normalized_name' => $normalizedName,
 
-                    'visible_name' =>
-                        $visibleName,
+                    'visible_name' => $visibleName,
                 ];
 
                 if (
@@ -315,26 +299,19 @@ class ProcessImportJob
                 ) {
                     $this
                         ->flushContactsAndPendingTransactions(
-                            pendingContacts:
-                            $pendingContacts,
+                            pendingContacts: $pendingContacts,
 
-                            pendingTransactions:
-                            $pendingTransactions,
+                            pendingTransactions: $pendingTransactions,
 
-                            transactionBatch:
-                            $transactionBatch,
+                            transactionBatch: $transactionBatch,
 
-                            contactCache:
-                            $contactCache,
+                            contactCache: $contactCache,
 
-                            aliasCache:
-                            $aliasCache,
+                            aliasCache: $aliasCache,
 
-                            categorizer:
-                            $categorizer,
+                            categorizer: $categorizer,
 
-                            now:
-                            $now
+                            now: $now
                         );
                 }
             }
@@ -343,11 +320,9 @@ class ProcessImportJob
                 step: 'parse_stream',
                 startedAt: $parseStartedAt,
                 extra: [
-                    'transactions_read' =>
-                        $processedTransactions,
+                    'transactions_read' => $processedTransactions,
 
-                    'new_contact_candidates' =>
-                        $newContactCandidates,
+                    'new_contact_candidates' => $newContactCandidates,
                 ]
             );
 
@@ -362,26 +337,19 @@ class ProcessImportJob
 
             $this
                 ->flushContactsAndPendingTransactions(
-                    pendingContacts:
-                    $pendingContacts,
+                    pendingContacts: $pendingContacts,
 
-                    pendingTransactions:
-                    $pendingTransactions,
+                    pendingTransactions: $pendingTransactions,
 
-                    transactionBatch:
-                    $transactionBatch,
+                    transactionBatch: $transactionBatch,
 
-                    contactCache:
-                    $contactCache,
+                    contactCache: $contactCache,
 
-                    aliasCache:
-                    $aliasCache,
+                    aliasCache: $aliasCache,
 
-                    categorizer:
-                    $categorizer,
+                    categorizer: $categorizer,
 
-                    now:
-                    $now
+                    now: $now
                 );
 
             $this->flushTransactions(
@@ -390,16 +358,14 @@ class ProcessImportJob
 
             $this->logStep(
                 step: 'final_flush',
-                startedAt:
-                $finalFlushStartedAt
+                startedAt: $finalFlushStartedAt
             );
 
             if ($processedTransactions === 0) {
                 $this->import->update([
                     'status' => 'failed',
                     'processed_at' => now(),
-                    'error_message' =>
-                        'Nenhuma transação foi encontrada no arquivo.',
+                    'error_message' => 'Nenhuma transação foi encontrada no arquivo.',
                 ]);
 
                 return;
@@ -420,17 +386,13 @@ class ProcessImportJob
             Log::info(
                 "Importação {$this->import->id} concluída.",
                 [
-                    'user_id' =>
-                        $this->import->user_id,
+                    'user_id' => $this->import->user_id,
 
-                    'bank' =>
-                        $bank,
+                    'bank' => $bank,
 
-                    'transactions_processed' =>
-                        $processedTransactions,
+                    'transactions_processed' => $processedTransactions,
 
-                    'new_contact_candidates' =>
-                        $newContactCandidates,
+                    'new_contact_candidates' => $newContactCandidates,
 
                     'total_seconds' => round(
                         microtime(true)
@@ -450,17 +412,13 @@ class ProcessImportJob
             Log::error(
                 "Erro na importação {$this->import->id}.",
                 [
-                    'user_id' =>
-                        $this->import->user_id,
+                    'user_id' => $this->import->user_id,
 
-                    'bank' =>
-                        $this->import->bank,
+                    'bank' => $this->import->bank,
 
-                    'message' =>
-                        $exception->getMessage(),
+                    'message' => $exception->getMessage(),
 
-                    'exception' =>
-                        $exception,
+                    'exception' => $exception,
                 ]
             );
 
@@ -517,16 +475,15 @@ class ProcessImportJob
                 5000,
                 function ($contacts) use (&$cache): void {
                     foreach (
-                        $contacts
-                        as $contact
+                        $contacts as $contact
                     ) {
                         $cache[
                             $contact
                                 ->normalized_name
                         ] = $this
-                                ->contactRowToArray(
-                                    $contact
-                                );
+                            ->contactRowToArray(
+                                $contact
+                            );
                     }
                 },
                 'id'
@@ -585,16 +542,15 @@ class ProcessImportJob
                 5000,
                 function ($aliases) use (&$cache): void {
                     foreach (
-                        $aliases
-                        as $alias
+                        $aliases as $alias
                     ) {
                         $cache[
                             $alias
                                 ->alias_normalized_name
                         ] = $this
-                                ->contactRowToArray(
-                                    $alias
-                                );
+                            ->contactRowToArray(
+                                $alias
+                            );
                     }
                 },
                 'contact_aliases.id',
@@ -607,7 +563,8 @@ class ProcessImportJob
     /**
      * Prepara um contato para inserção.
      *
-     * @param array<string, array<string, mixed>> $pendingContacts
+     * @param  array<string, mixed>  $transaction
+     * @param  array<string, array<string, mixed>>  $pendingContacts
      */
     private function queueContact(
         string $visibleName,
@@ -623,19 +580,17 @@ class ProcessImportJob
          */
         if (
             isset(
-            $pendingContacts[
-                $normalizedName
-            ]
-        )
+                $pendingContacts[
+                    $normalizedName
+                ]
+            )
         ) {
             $this->enrichPendingContact(
-                pendingContact:
-                $pendingContacts[
+                pendingContact: $pendingContacts[
                     $normalizedName
                 ],
 
-                transaction:
-                $transaction
+                transaction: $transaction
             );
 
             return;
@@ -650,7 +605,7 @@ class ProcessImportJob
             ]
             ?? null;
 
-        if (!$contactType) {
+        if (! $contactType) {
             $contactType =
                 $categorizer->guessContactType(
                     $visibleName
@@ -660,48 +615,42 @@ class ProcessImportJob
         $pendingContacts[
             $normalizedName
         ] = [
-            'user_id' =>
-                $this->import->user_id,
+            'user_id' => $this->import->user_id,
 
-            'name' =>
-                $visibleName,
+            'name' => $visibleName,
 
-            'normalized_name' =>
-                $normalizedName,
+            'normalized_name' => $normalizedName,
 
-            'document' =>
-                $transaction[
-                    'counterparty_document'
-                ] ?? null,
+            'document' => $transaction[
+                'counterparty_document'
+            ] ?? null,
 
-            'contact_type' =>
-                $contactType,
+            'contact_type' => $contactType,
 
-            'default_expense_category_id' =>
-                $categorizer
-                    ->guessCategoryId(
-                        $visibleName,
-                        'expense'
-                    ),
+            'default_expense_category_id' => $categorizer
+                ->guessCategoryId(
+                    $visibleName,
+                    'expense'
+                ),
 
-            'default_income_category_id' =>
-                $categorizer
-                    ->guessCategoryId(
-                        $visibleName,
-                        'income'
-                    ),
+            'default_income_category_id' => $categorizer
+                ->guessCategoryId(
+                    $visibleName,
+                    'income'
+                ),
 
-            'created_at' =>
-                $now,
+            'created_at' => $now,
 
-            'updated_at' =>
-                $now,
+            'updated_at' => $now,
         ];
     }
 
     /**
      * Enriquece um contato ainda pendente com dados
      * encontrados em outra transação do mesmo arquivo.
+     *
+     * @param  array<string, mixed>  $pendingContact
+     * @param  array<string, mixed>  $transaction
      */
     private function enrichPendingContact(
         array &$pendingContact,
@@ -723,11 +672,11 @@ class ProcessImportJob
 
         if (
             empty(
-            $pendingContact[
-                'document'
-            ]
-        )
-            && !empty($document)
+                $pendingContact[
+                    'document'
+                ]
+            )
+            && ! empty($document)
         ) {
             $pendingContact[
                 'document'
@@ -736,11 +685,11 @@ class ProcessImportJob
 
         if (
             empty(
-            $pendingContact[
-                'contact_type'
-            ]
-        )
-            && !empty($contactType)
+                $pendingContact[
+                    'contact_type'
+                ]
+            )
+            && ! empty($contactType)
         ) {
             $pendingContact[
                 'contact_type'
@@ -752,11 +701,11 @@ class ProcessImportJob
      * Persiste os contatos e depois prepara as transações
      * que estavam aguardando seus IDs.
      *
-     * @param array<string, array<string, mixed>> $pendingContacts
-     * @param array<int, array<string, mixed>> $pendingTransactions
-     * @param array<int, array<string, mixed>> $transactionBatch
-     * @param array<string, array<string, mixed>> $contactCache
-     * @param array<string, array<string, mixed>> $aliasCache
+     * @param  array<string, array<string, mixed>>  $pendingContacts
+     * @param  array<int, array<string, mixed>>  $pendingTransactions
+     * @param  array<int, array<string, mixed>>  $transactionBatch
+     * @param  array<string, array<string, mixed>>  $contactCache
+     * @param  array<string, array<string, mixed>>  $aliasCache
      */
     private function flushContactsAndPendingTransactions(
         array &$pendingContacts,
@@ -767,13 +716,10 @@ class ProcessImportJob
         StringMatchCategorizer $categorizer,
         mixed $now
     ): void {
-        if (!empty($pendingContacts)) {
-            $this->flushContacts(
-                pendingContacts:
-                $pendingContacts,
-
-                contactCache:
-                $contactCache
+        if (! empty($pendingContacts)) {
+            $contactCache = $this->flushContacts(
+                pendingContacts: $pendingContacts,
+                contactCache: $contactCache
             );
         }
 
@@ -782,8 +728,7 @@ class ProcessImportJob
         }
 
         foreach (
-            $pendingTransactions
-            as $pending
+            $pendingTransactions as $pending
         ) {
             $normalizedName =
                 $pending[
@@ -806,22 +751,17 @@ class ProcessImportJob
             }
 
             $this->queueTransaction(
-                transaction:
-                $pending[
+                transaction: $pending[
                     'transaction'
                 ],
 
-                contact:
-                $contact,
+                contact: $contact,
 
-                categorizer:
-                $categorizer,
+                categorizer: $categorizer,
 
-                transactionBatch:
-                $transactionBatch,
+                transactionBatch: $transactionBatch,
 
-                now:
-                $now
+                now: $now
             );
 
             if (
@@ -840,15 +780,16 @@ class ProcessImportJob
     /**
      * Persiste contatos em lote.
      *
-     * @param array<string, array<string, mixed>> $pendingContacts
-     * @param array<string, array<string, mixed>> $contactCache
+     * @param  array<string, array<string, mixed>>  $pendingContacts
+     * @param  array<string, array<string, mixed>>  $contactCache
+     * @return array<string, array<string, mixed>>
      */
     private function flushContacts(
         array &$pendingContacts,
-        array &$contactCache
-    ): void {
+        array $contactCache
+    ): array {
         if (empty($pendingContacts)) {
-            return;
+            return $contactCache;
         }
 
         $startedAt = microtime(true);
@@ -867,29 +808,22 @@ class ProcessImportJob
             array_chunk(
                 $rows,
                 self::CONTACT_BATCH_SIZE
-            )
-            as $chunk
+            ) as $chunk
         ) {
             $insertedContacts =
-                $this
-                    ->insertContactsReturning(
-                        $chunk
-                    );
+                $this->insertContactsReturning(
+                    $chunk
+                );
 
-            foreach (
-                $insertedContacts
-                as $contact
-            ) {
+            foreach ($insertedContacts as $contact) {
                 $normalizedName =
-                    (string) $contact
-                        ->normalized_name;
+                    (string) $contact->normalized_name;
 
                 $contactCache[
                     $normalizedName
-                ] = $this
-                        ->contactRowToArray(
-                            $contact
-                        );
+                ] = $this->contactRowToArray(
+                    $contact
+                );
 
                 $resolvedNormalizedNames[
                     $normalizedName
@@ -905,14 +839,13 @@ class ProcessImportJob
             array_values(
                 array_filter(
                     $normalizedNames,
-                    static fn(
-                    string $normalizedName
-                ): bool =>
-                    !isset(
-                    $resolvedNormalizedNames[
-                        $normalizedName
-                    ]
-                )
+                    static fn (
+                        string $normalizedName
+                    ): bool => ! isset(
+                        $resolvedNormalizedNames[
+                            $normalizedName
+                        ]
+                    )
                 )
             );
 
@@ -920,13 +853,8 @@ class ProcessImportJob
             array_chunk(
                 $missingNormalizedNames,
                 self::CONTACT_BATCH_SIZE
-            )
-            as $missingChunk
+            ) as $missingChunk
         ) {
-            if (empty($missingChunk)) {
-                continue;
-            }
-
             $existingContacts =
                 DB::table('contacts')
                     ->where(
@@ -947,17 +875,15 @@ class ProcessImportJob
                         'default_income_category_id',
                     ]);
 
-            foreach (
-                $existingContacts
-                as $contact
-            ) {
+            foreach ($existingContacts as $contact) {
+                $normalizedName =
+                    (string) $contact->normalized_name;
+
                 $contactCache[
+                    $normalizedName
+                ] = $this->contactRowToArray(
                     $contact
-                        ->normalized_name
-                ] = $this
-                        ->contactRowToArray(
-                            $contact
-                        );
+                );
             }
         }
 
@@ -965,29 +891,28 @@ class ProcessImportJob
             step: 'flush_contacts',
             startedAt: $startedAt,
             extra: [
-                'batch_size' =>
-                    count($normalizedNames),
+                'batch_size' => count($normalizedNames),
 
-                'inserted_contacts' =>
-                    count(
-                        $resolvedNormalizedNames
-                    ),
+                'inserted_contacts' => count(
+                    $resolvedNormalizedNames
+                ),
 
-                'conflicting_contacts' =>
-                    count(
-                        $missingNormalizedNames
-                    ),
+                'conflicting_contacts' => count(
+                    $missingNormalizedNames
+                ),
             ]
         );
 
         $pendingContacts = [];
+
+        return $contactCache;
     }
 
     /**
      * Executa um INSERT em lote com RETURNING.
      *
-     * @param array<int, array<string, mixed>> $rows
-     * @return array<int, object>
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, stdClass>
      */
     private function insertContactsReturning(
         array $rows
@@ -1011,17 +936,16 @@ class ProcessImportJob
         $quotedColumns = implode(
             ', ',
             array_map(
-                static fn(
-                string $column
-            ): string =>
-                "\"{$column}\"",
+                static fn (
+                    string $column
+                ): string => "\"{$column}\"",
                 $columns
             )
         );
 
         $rowPlaceholder =
             '('
-            . implode(
+            .implode(
                 ', ',
                 array_fill(
                     0,
@@ -1029,7 +953,7 @@ class ProcessImportJob
                     '?'
                 )
             )
-            . ')';
+            .')';
 
         $valuePlaceholders = [];
         $bindings = [];
@@ -1082,9 +1006,9 @@ class ProcessImportJob
     /**
      * Prepara uma transação para inserção.
      *
-     * @param array<string, mixed> $transaction
-     * @param array<string, mixed> $contact
-     * @param array<int, array<string, mixed>> $transactionBatch
+     * @param  array<string, mixed>  $transaction
+     * @param  array<string, mixed>  $contact
+     * @param  array<int, array<string, mixed>>  $transactionBatch
      */
     private function queueTransaction(
         array $transaction,
@@ -1105,7 +1029,7 @@ class ProcessImportJob
                 'default_income_category_id'
             ];
 
-        if (!$categoryId) {
+        if (! $categoryId) {
             $categoryId =
                 $categorizer
                     ->guessCategoryId(
@@ -1115,66 +1039,54 @@ class ProcessImportJob
         }
 
         $transactionBatch[] = [
-            'user_id' =>
-                $this->import->user_id,
+            'user_id' => $this->import->user_id,
 
-            'import_id' =>
-                $this->import->id,
+            'import_id' => $this->import->id,
 
-            'contact_id' =>
-                $contact['id'],
+            'contact_id' => $contact['id'],
 
-            'category_id' =>
-                $categoryId,
+            'category_id' => $categoryId,
 
-            'transaction_code' =>
-                $transaction[
-                    'transaction_code'
-                ]
+            'transaction_code' => $transaction[
+                'transaction_code'
+            ]
                 ?? $this
                     ->fallbackTransactionCode(
                         $transaction
                     ),
 
-            'transaction_date' =>
-                $transaction[
-                    'transaction_date'
-                ],
+            'transaction_date' => $transaction[
+                'transaction_date'
+            ],
 
-            'description' =>
-                $transaction[
-                    'description'
-                ],
+            'description' => $transaction[
+                'description'
+            ],
 
-            'amount' =>
-                $transaction[
-                    'amount'
-                ],
+            'amount' => $transaction[
+                'amount'
+            ],
 
-            'source_type' =>
-                $transaction[
-                    'source_type'
-                ]
+            'source_type' => $transaction[
+                'source_type'
+            ]
                 ?? 'manual_import',
 
-            'transaction_method' =>
-                $transaction[
-                    'transaction_method'
-                ]
+            'transaction_method' => $transaction[
+                'transaction_method'
+            ]
                 ?? 'other',
 
-            'created_at' =>
-                $now,
+            'created_at' => $now,
 
-            'updated_at' =>
-                $now,
+            'updated_at' => $now,
         ];
     }
 
     /**
      * Insere transações em lote.
      *
-     * @param array<int, array<string, mixed>> $transactionBatch
+     * @param  array<int, array<string, mixed>>  $transactionBatch
      */
     private function flushTransactions(
         array &$transactionBatch
@@ -1193,8 +1105,7 @@ class ProcessImportJob
             array_chunk(
                 $transactionBatch,
                 self::TRANSACTION_BATCH_SIZE
-            )
-            as $chunk
+            ) as $chunk
         ) {
             DB::table('transactions')
                 ->insertOrIgnore(
@@ -1206,8 +1117,7 @@ class ProcessImportJob
             step: 'flush_transactions',
             startedAt: $startedAt,
             extra: [
-                'batch_size' =>
-                    $total,
+                'batch_size' => $total,
             ]
         );
 
@@ -1220,38 +1130,31 @@ class ProcessImportJob
      * @return array<string, mixed>
      */
     private function contactRowToArray(
-        object $contact
+        stdClass $contact
     ): array {
         return [
-            'id' =>
-                (int) $contact->id,
+            'id' => (int) $contact->id,
 
-            'name' =>
-                (string) $contact->name,
+            'name' => (string) $contact->name,
 
-            'normalized_name' =>
-                (string) $contact
-                    ->normalized_name,
+            'normalized_name' => (string) $contact
+                ->normalized_name,
 
-            'document' =>
-                $contact->document
+            'document' => $contact->document
                 ?? null,
 
-            'contact_type' =>
-                $contact->contact_type
+            'contact_type' => $contact->contact_type
                 ?? null,
 
-            'default_expense_category_id' =>
-                $contact
-                    ->default_expense_category_id
+            'default_expense_category_id' => $contact
+                ->default_expense_category_id
                 !== null
                 ? (int) $contact
                     ->default_expense_category_id
                 : null,
 
-            'default_income_category_id' =>
-                $contact
-                    ->default_income_category_id
+            'default_income_category_id' => $contact
+                ->default_income_category_id
                 !== null
                 ? (int) $contact
                     ->default_income_category_id
@@ -1274,6 +1177,8 @@ class ProcessImportJob
     /**
      * Gera um identificador quando o parser não fornece
      * um código próprio da transação.
+     *
+     * @param  array<string, mixed>  $transaction
      */
     private function fallbackTransactionCode(
         array $transaction
@@ -1304,6 +1209,8 @@ class ProcessImportJob
 
     /**
      * Registra duração e memória de uma etapa.
+     *
+     * @param  array<string, mixed>  $extra
      */
     private function logStep(
         string $step,

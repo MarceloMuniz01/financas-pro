@@ -34,29 +34,30 @@ FROM php-base AS builder
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Node 22 vindo da imagem oficial
-COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+# Node 24 LTS, using the same Debian base family as PHP.
+COPY --from=node:24-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:24-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
-# Primeiro os manifests, aproveitando cache do Docker
+# Dependency manifests first, preserving Docker layer cache.
 COPY composer.json composer.lock ./
 RUN composer install \
     --no-dev \
     --prefer-dist \
     --no-interaction \
     --no-progress \
-    --no-scripts
+    --no-scripts \
+    --no-autoloader
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
-# Agora o código da aplicação
+# Application source comes after dependency layers.
 COPY . .
 
-# Laravel precisa estar completo antes do package discovery.
+# Laravel must be complete before package discovery runs.
 RUN composer dump-autoload \
         --optimize \
         --no-dev \
@@ -65,12 +66,15 @@ RUN composer dump-autoload \
 
 
 # =========================================================
-# Aplicação PHP-FPM
+# PHP-FPM application
 # =========================================================
 FROM php-base AS app
 
 ENV APP_ENV=production
 ENV LOG_CHANNEL=stderr
+
+# Start from PHP's production defaults and then apply project overrides.
+RUN cp "${PHP_INI_DIR}/php.ini-production" "${PHP_INI_DIR}/php.ini"
 
 COPY docker/php/production.ini \
     ${PHP_INI_DIR}/conf.d/99-production.ini
@@ -79,6 +83,7 @@ COPY --from=builder --chown=www-data:www-data \
     /var/www/html /var/www/html
 
 RUN mkdir -p \
+        storage/app \
         storage/framework/cache \
         storage/framework/sessions \
         storage/framework/views \
@@ -96,7 +101,7 @@ CMD ["php-fpm"]
 # =========================================================
 # Nginx
 # =========================================================
-FROM nginx:1.29-alpine AS nginx
+FROM nginx:1.30.5-alpine AS nginx
 
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 

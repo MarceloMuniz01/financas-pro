@@ -38,7 +38,7 @@ class ContactMergeService
      * Os contatos secundários passam apenas a apontar para
      * o contato principal por merged_into_contact_id.
      *
-     * @param array<int, int|string> $contactIds
+     * @param  array<int, int|string>  $contactIds
      */
     public function mergeMany(
         int $userId,
@@ -51,21 +51,19 @@ class ContactMergeService
 
         if (count($contactIds) < 2) {
             throw ValidationException::withMessages([
-                'contact_ids' =>
-                    'Selecione pelo menos dois contatos para mesclar.',
+                'contact_ids' => 'Selecione pelo menos dois contatos para mesclar.',
             ]);
         }
 
         if (
-            !in_array(
+            ! in_array(
                 $targetContactId,
                 $contactIds,
                 true
             )
         ) {
             throw ValidationException::withMessages([
-                'target_contact_id' =>
-                    'O contato principal deve estar entre os contatos selecionados.',
+                'target_contact_id' => 'O contato principal deve estar entre os contatos selecionados.',
             ]);
         }
 
@@ -94,8 +92,7 @@ class ContactMergeService
                     !== count($contactIds)
                 ) {
                     throw ValidationException::withMessages([
-                        'contact_ids' =>
-                            'Um ou mais contatos não existem ou não pertencem ao usuário.',
+                        'contact_ids' => 'Um ou mais contatos não existem ou não pertencem ao usuário.',
                     ]);
                 }
 
@@ -104,10 +101,9 @@ class ContactMergeService
                     $targetContactId
                 );
 
-                if (!$targetContact) {
+                if (! $targetContact) {
                     throw ValidationException::withMessages([
-                        'target_contact_id' =>
-                            'O contato principal não foi encontrado.',
+                        'target_contact_id' => 'O contato principal não foi encontrado.',
                     ]);
                 }
 
@@ -128,16 +124,14 @@ class ContactMergeService
                     !== null
                 ) {
                     throw ValidationException::withMessages([
-                        'target_contact_id' =>
-                            'O contato escolhido já está vinculado a outro contato. Escolha o contato principal.',
+                        'target_contact_id' => 'O contato escolhido já está vinculado a outro contato. Escolha o contato principal.',
                     ]);
                 }
 
                 $sourceContactIds = array_values(
                     array_filter(
                         $contactIds,
-                        static fn(int $contactId): bool =>
-                        $contactId
+                        static fn (int $contactId): bool => $contactId
                         !== $targetContactId
                     )
                 );
@@ -170,8 +164,7 @@ class ContactMergeService
 
                 if ($wouldCreateCycle) {
                     throw ValidationException::withMessages([
-                        'contact_ids' =>
-                            'A mesclagem criaria um vínculo circular entre os contatos.',
+                        'contact_ids' => 'A mesclagem criaria um vínculo circular entre os contatos.',
                     ]);
                 }
 
@@ -200,8 +193,7 @@ class ContactMergeService
                     )
                     ->pluck('id')
                     ->map(
-                        static fn(mixed $id): int =>
-                        (int) $id
+                        static fn (mixed $id): int => (int) $id
                     )
                     ->all();
 
@@ -219,16 +211,14 @@ class ContactMergeService
                 $contactsToLink = array_values(
                     array_filter(
                         $contactsToLink,
-                        static fn(int $contactId): bool =>
-                        $contactId
+                        static fn (int $contactId): bool => $contactId
                         !== $targetContactId
                     )
                 );
 
                 if ($contactsToLink === []) {
                     throw ValidationException::withMessages([
-                        'contact_ids' =>
-                            'Não existem contatos válidos para vincular.',
+                        'contact_ids' => 'Não existem contatos válidos para vincular.',
                     ]);
                 }
 
@@ -242,14 +232,11 @@ class ContactMergeService
                         $contactsToLink
                     )
                     ->update([
-                        'merged_into_contact_id' =>
-                            $targetContactId,
+                        'merged_into_contact_id' => $targetContactId,
 
-                        'merged_at' =>
-                            now(),
+                        'merged_at' => now(),
 
-                        'updated_at' =>
-                            now(),
+                        'updated_at' => now(),
                     ]);
 
                 /*
@@ -259,11 +246,9 @@ class ContactMergeService
                  * por todos os contatos vinculados.
                  */
                 $targetContact->forceFill([
-                    'merged_into_contact_id' =>
-                        null,
+                    'merged_into_contact_id' => null,
 
-                    'merged_at' =>
-                        null,
+                    'merged_at' => null,
                 ])->save();
 
                 return $targetContact
@@ -304,10 +289,9 @@ class ContactMergeService
                         $contactId
                     );
 
-                if (!$contact) {
+                if (! $contact) {
                     throw ValidationException::withMessages([
-                        'contact_id' =>
-                            'O contato não foi encontrado.',
+                        'contact_id' => 'O contato não foi encontrado.',
                     ]);
                 }
 
@@ -316,17 +300,14 @@ class ContactMergeService
                     === null
                 ) {
                     throw ValidationException::withMessages([
-                        'contact_id' =>
-                            'Este contato já é um contato principal.',
+                        'contact_id' => 'Este contato já é um contato principal.',
                     ]);
                 }
 
                 $contact->update([
-                    'merged_into_contact_id' =>
-                        null,
+                    'merged_into_contact_id' => null,
 
-                    'merged_at' =>
-                        null,
+                    'merged_at' => null,
                 ]);
 
                 return $contact->fresh([
@@ -360,10 +341,9 @@ class ContactMergeService
                         $targetContactId
                     );
 
-                if (!$targetContact) {
+                if (! $targetContact) {
                     throw ValidationException::withMessages([
-                        'target_contact_id' =>
-                            'O contato principal não foi encontrado.',
+                        'target_contact_id' => 'O contato principal não foi encontrado.',
                     ]);
                 }
 
@@ -372,8 +352,7 @@ class ContactMergeService
                     !== null
                 ) {
                     throw ValidationException::withMessages([
-                        'target_contact_id' =>
-                            'O contato informado não é um contato principal.',
+                        'target_contact_id' => 'O contato informado não é um contato principal.',
                     ]);
                 }
 
@@ -391,8 +370,7 @@ class ContactMergeService
 
                 if ($linkedContacts->isEmpty()) {
                     throw ValidationException::withMessages([
-                        'target_contact_id' =>
-                            'Este contato não possui contatos vinculados.',
+                        'target_contact_id' => 'Este contato não possui contatos vinculados.',
                     ]);
                 }
 
@@ -406,14 +384,11 @@ class ContactMergeService
                         $targetContactId
                     )
                     ->update([
-                        'merged_into_contact_id' =>
-                            null,
+                        'merged_into_contact_id' => null,
 
-                        'merged_at' =>
-                            null,
+                        'merged_at' => null,
 
-                        'updated_at' =>
-                            now(),
+                        'updated_at' => now(),
                     ]);
 
                 return Contact::query()
@@ -439,7 +414,7 @@ class ContactMergeService
     /**
      * Normaliza e remove IDs inválidos ou repetidos.
      *
-     * @param array<int, int|string> $contactIds
+     * @param  array<int, int|string>  $contactIds
      * @return array<int, int>
      */
     private function normalizeContactIds(
@@ -448,13 +423,11 @@ class ContactMergeService
         return array_values(
             array_unique(
                 array_map(
-                    static fn(mixed $contactId): int =>
-                    (int) $contactId,
+                    static fn (mixed $contactId): int => (int) $contactId,
 
                     array_filter(
                         $contactIds,
-                        static fn(mixed $contactId): bool =>
-                        is_numeric($contactId)
+                        static fn (mixed $contactId): bool => is_numeric($contactId)
                         && (int) $contactId > 0
                     )
                 )

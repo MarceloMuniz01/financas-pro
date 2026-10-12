@@ -19,8 +19,7 @@ return new class extends Migration
              */
             $table->foreignId('user_id')
                 ->constrained()
-                ->cascadeOnDelete()
-                ->index();
+                ->cascadeOnDelete();
 
             /*
              * Categoria padrão para despesas.
@@ -36,14 +35,6 @@ return new class extends Migration
             $table->foreignId('default_income_category_id')
                 ->nullable()
                 ->constrained('categories')
-                ->nullOnDelete();
-
-            /*
-             * Contato semelhante (uso futuro para deduplicação).
-             */
-            $table->foreignId('looks_like_contact_id')
-                ->nullable()
-                ->constrained('contacts')
                 ->nullOnDelete();
 
             /*
@@ -65,7 +56,7 @@ return new class extends Migration
              */
             $table->unique([
                 'user_id',
-                'name',
+                'normalized_name',
             ]);
         });
     }

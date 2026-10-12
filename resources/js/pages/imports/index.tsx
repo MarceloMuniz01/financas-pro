@@ -1,22 +1,9 @@
+import { Head, router, usePage } from '@inertiajs/react';
+import type { ChangeEvent, FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
-import {
-    Head,
-    router,
-    usePage,
-} from '@inertiajs/react';
-import {
-    ChangeEvent,
-    FormEvent,
-    useEffect,
-    useRef,
-    useState,
-} from 'react';
 
-type ImportStatus =
-    | 'pending'
-    | 'processing'
-    | 'done'
-    | 'failed';
+type ImportStatus = 'pending' | 'processing' | 'done' | 'failed';
 
 type ImportItem = {
     id: number;
@@ -69,28 +56,20 @@ const breadcrumbs = [
     },
 ];
 
-export default function ImportsIndex({
-    imports,
-}: Props) {
+export default function ImportsIndex({ imports }: Props) {
     const page = usePage<PageProps>();
 
-    const fileInputRef =
-        useRef<HTMLInputElement | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    const [file, setFile] =
-        useState<File | null>(null);
+    const [file, setFile] = useState<File | null>(null);
 
-    const [isUploading, setIsUploading] =
-        useState(false);
+    const [isUploading, setIsUploading] = useState(false);
 
-    const [clientError, setClientError] =
-        useState<string | null>(null);
+    const [clientError, setClientError] = useState<string | null>(null);
 
-    const successMessage =
-        page.props.flash?.success ?? null;
+    const successMessage = page.props.flash?.success ?? null;
 
-    const serverError =
-        page.props.flash?.error ?? null;
+    const serverError = page.props.flash?.error ?? null;
 
     /*
      * Caso algum processamento antigo ainda esteja
@@ -101,9 +80,7 @@ export default function ImportsIndex({
      * já volta como done ou failed.
      */
     const hasActiveImport = imports.data.some(
-        (item) =>
-            item.status === 'pending'
-            || item.status === 'processing',
+        (item) => item.status === 'pending' || item.status === 'processing',
     );
 
     useEffect(() => {
@@ -111,64 +88,39 @@ export default function ImportsIndex({
             return;
         }
 
-        const intervalId = window.setInterval(
-            () => {
-                router.reload({
-                    only: ['imports'],
-                    preserveScroll: true,
-                    preserveState: true,
-                });
-            },
-            3000,
-        );
+        const intervalId = window.setInterval(() => {
+            router.reload({
+                only: ['imports'],
+            });
+        }, 3000);
 
         return () => {
             window.clearInterval(intervalId);
         };
     }, [hasActiveImport]);
 
-    function handleFileChange(
-        event: ChangeEvent<HTMLInputElement>,
-    ) {
-        const selectedFile =
-            event.target.files?.[0] ?? null;
+    function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+        const selectedFile = event.target.files?.[0] ?? null;
 
         setFile(selectedFile);
         setClientError(null);
     }
 
-    function handleSubmit(
-        event: FormEvent<HTMLFormElement>,
-    ) {
+    function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
         if (!file) {
-            setClientError(
-                'Selecione um arquivo de extrato.',
-            );
+            setClientError('Selecione um arquivo de extrato.');
 
             return;
         }
 
-        const extension =
-            file.name
-                .split('.')
-                .pop()
-                ?.toLowerCase()
-            ?? '';
+        const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
 
-        const acceptedExtensions = [
-            'csv',
-            'txt',
-            'ofx',
-        ];
+        const acceptedExtensions = ['csv', 'txt', 'ofx'];
 
-        if (
-            !acceptedExtensions.includes(extension)
-        ) {
-            setClientError(
-                'Selecione um arquivo CSV, TXT ou OFX.',
-            );
+        if (!acceptedExtensions.includes(extension)) {
+            setClientError('Selecione um arquivo CSV, TXT ou OFX.');
 
             return;
         }
@@ -195,10 +147,10 @@ export default function ImportsIndex({
 
                 onError: (errors) => {
                     const firstError =
-                        errors.file
-                        || errors.import
-                        || errors.message
-                        || 'Não foi possível importar o arquivo.';
+                        errors.file ||
+                        errors.import ||
+                        errors.message ||
+                        'Não foi possível importar o arquivo.';
 
                     setClientError(firstError);
                 },
@@ -223,8 +175,8 @@ export default function ImportsIndex({
 
                         <p className="mt-1 text-sm text-muted-foreground">
                             Envie seu extrato bancário. O banco será
-                            identificado automaticamente pelo conteúdo
-                            do arquivo.
+                            identificado automaticamente pelo conteúdo do
+                            arquivo.
                         </p>
                     </div>
 
@@ -259,11 +211,9 @@ export default function ImportsIndex({
                                     <span className="text-muted-foreground">
                                         Arquivo selecionado:
                                     </span>{' '}
-
                                     <span className="font-medium">
                                         {file.name}
                                     </span>
-
                                     <span className="ml-2 text-xs text-muted-foreground">
                                         ({formatFileSize(file.size)})
                                     </span>
@@ -286,10 +236,7 @@ export default function ImportsIndex({
                         <div>
                             <button
                                 type="submit"
-                                disabled={
-                                    !file
-                                    || isUploading
-                                }
+                                disabled={!file || isUploading}
                                 className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isUploading
@@ -300,9 +247,8 @@ export default function ImportsIndex({
 
                         {isUploading && (
                             <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                                O arquivo está sendo processado. Não
-                                feche nem atualize esta página até a
-                                importação terminar.
+                                O arquivo está sendo processado. Não feche nem
+                                atualize esta página até a importação terminar.
                             </div>
                         )}
                     </form>
@@ -337,8 +283,8 @@ export default function ImportsIndex({
                             </p>
 
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Envie seu primeiro extrato usando o
-                                formulário acima.
+                                Envie seu primeiro extrato usando o formulário
+                                acima.
                             </p>
                         </div>
                     ) : (
@@ -374,68 +320,58 @@ export default function ImportsIndex({
                                     </thead>
 
                                     <tbody>
-                                        {imports.data.map(
-                                            (item) => (
-                                                <tr
-                                                    key={item.id}
-                                                    className="border-b last:border-b-0 hover:bg-muted/30"
-                                                >
-                                                    <td className="px-6 py-4">
-                                                        <div className="font-medium">
-                                                            {item.original_filename
-                                                                || 'Arquivo sem nome'}
+                                        {imports.data.map((item) => (
+                                            <tr
+                                                key={item.id}
+                                                className="border-b last:border-b-0 hover:bg-muted/30"
+                                            >
+                                                <td className="px-6 py-4">
+                                                    <div className="font-medium">
+                                                        {item.original_filename ||
+                                                            'Arquivo sem nome'}
+                                                    </div>
+
+                                                    {item.error_message && (
+                                                        <div className="mt-1 max-w-md text-xs leading-relaxed text-red-600">
+                                                            {item.error_message}
                                                         </div>
+                                                    )}
+                                                </td>
 
-                                                        {item.error_message && (
-                                                            <div className="mt-1 max-w-md text-xs leading-relaxed text-red-600">
-                                                                {
-                                                                    item.error_message
-                                                                }
-                                                            </div>
-                                                        )}
-                                                    </td>
+                                                <td className="px-6 py-4">
+                                                    {formatBank(item.bank)}
+                                                </td>
 
-                                                    <td className="px-6 py-4">
-                                                        {formatBank(
-                                                            item.bank,
-                                                        )}
-                                                    </td>
+                                                <td className="px-6 py-4 text-muted-foreground uppercase">
+                                                    {item.source}
+                                                </td>
 
-                                                    <td className="px-6 py-4 uppercase text-muted-foreground">
-                                                        {item.source}
-                                                    </td>
+                                                <td className="px-6 py-4">
+                                                    <StatusBadge
+                                                        status={item.status}
+                                                    />
+                                                </td>
 
-                                                    <td className="px-6 py-4">
-                                                        <StatusBadge
-                                                            status={
-                                                                item.status
-                                                            }
-                                                        />
-                                                    </td>
+                                                <td className="px-6 py-4 text-muted-foreground">
+                                                    {formatDate(
+                                                        item.created_at,
+                                                    )}
+                                                </td>
 
-                                                    <td className="px-6 py-4 text-muted-foreground">
-                                                        {formatDate(
-                                                            item.created_at,
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-6 py-4 text-muted-foreground">
-                                                        {item.processed_at
-                                                            ? formatDate(
-                                                                item.processed_at,
-                                                            )
-                                                            : '—'}
-                                                    </td>
-                                                </tr>
-                                            ),
-                                        )}
+                                                <td className="px-6 py-4 text-muted-foreground">
+                                                    {item.processed_at
+                                                        ? formatDate(
+                                                              item.processed_at,
+                                                          )
+                                                        : '—'}
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
 
-                            <Pagination
-                                imports={imports}
-                            />
+                            <Pagination imports={imports} />
                         </>
                     )}
                 </section>
@@ -444,11 +380,7 @@ export default function ImportsIndex({
     );
 }
 
-function StatusBadge({
-    status,
-}: {
-    status: ImportStatus;
-}) {
+function StatusBadge({ status }: { status: ImportStatus }) {
     const labels: Record<ImportStatus, string> = {
         pending: 'Aguardando',
         processing: 'Processando',
@@ -457,17 +389,13 @@ function StatusBadge({
     };
 
     const classes: Record<ImportStatus, string> = {
-        pending:
-            'bg-yellow-100 text-yellow-800',
+        pending: 'bg-yellow-100 text-yellow-800',
 
-        processing:
-            'bg-blue-100 text-blue-800',
+        processing: 'bg-blue-100 text-blue-800',
 
-        done:
-            'bg-green-100 text-green-800',
+        done: 'bg-green-100 text-green-800',
 
-        failed:
-            'bg-red-100 text-red-800',
+        failed: 'bg-red-100 text-red-800',
     };
 
     return (
@@ -479,11 +407,7 @@ function StatusBadge({
     );
 }
 
-function Pagination({
-    imports,
-}: {
-    imports: PaginatedImports;
-}) {
+function Pagination({ imports }: { imports: PaginatedImports }) {
     if (imports.last_page <= 1) {
         return null;
     }
@@ -491,51 +415,43 @@ function Pagination({
     return (
         <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between md:px-6">
             <p className="text-sm text-muted-foreground">
-                Exibindo {imports.from ?? 0} até{' '}
-                {imports.to ?? 0} de {imports.total}
+                Exibindo {imports.from ?? 0} até {imports.to ?? 0} de{' '}
+                {imports.total}
             </p>
 
             <div className="flex flex-wrap gap-1">
-                {imports.links.map(
-                    (link, index) => (
-                        <button
-                            key={`${link.label}-${index}`}
-                            type="button"
-                            disabled={!link.url}
-                            onClick={() => {
-                                if (!link.url) {
-                                    return;
-                                }
+                {imports.links.map((link, index) => (
+                    <button
+                        key={`${link.label}-${index}`}
+                        type="button"
+                        disabled={!link.url}
+                        onClick={() => {
+                            if (!link.url) {
+                                return;
+                            }
 
-                                router.visit(
-                                    link.url,
-                                    {
-                                        preserveScroll:
-                                            true,
+                            router.visit(link.url, {
+                                preserveScroll: true,
 
-                                        preserveState:
-                                            true,
-                                    },
-                                );
-                            }}
-                            className={`min-w-9 rounded-md border px-3 py-2 text-sm ${link.active
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-background hover:bg-muted'
-                                } disabled:cursor-not-allowed disabled:opacity-40`}
-                            dangerouslySetInnerHTML={{
-                                __html: link.label,
-                            }}
-                        />
-                    ),
-                )}
+                                preserveState: true,
+                            });
+                        }}
+                        className={`min-w-9 rounded-md border px-3 py-2 text-sm ${
+                            link.active
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-background hover:bg-muted'
+                        } disabled:cursor-not-allowed disabled:opacity-40`}
+                        dangerouslySetInnerHTML={{
+                            __html: link.label,
+                        }}
+                    />
+                ))}
             </div>
         </div>
     );
 }
 
-function formatBank(
-    bank: string | null,
-): string {
+function formatBank(bank: string | null): string {
     if (!bank) {
         return 'Não identificado';
     }
@@ -549,34 +465,21 @@ function formatBank(
     return banks[bank] ?? bank;
 }
 
-function formatDate(
-    value: string,
-): string {
-    return new Intl.DateTimeFormat(
-        'pt-BR',
-        {
-            dateStyle: 'short',
-            timeStyle: 'short',
-        },
-    ).format(new Date(value));
+function formatDate(value: string): string {
+    return new Intl.DateTimeFormat('pt-BR', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+    }).format(new Date(value));
 }
 
-function formatFileSize(
-    bytes: number,
-): string {
+function formatFileSize(bytes: number): string {
     if (bytes < 1024) {
         return `${bytes} B`;
     }
 
     if (bytes < 1024 * 1024) {
-        return `${(
-            bytes / 1024
-        ).toFixed(1)} KB`;
+        return `${(bytes / 1024).toFixed(1)} KB`;
     }
 
-    return `${(
-        bytes
-        / 1024
-        / 1024
-    ).toFixed(1)} MB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

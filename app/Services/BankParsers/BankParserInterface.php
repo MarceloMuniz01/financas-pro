@@ -10,7 +10,8 @@ interface BankParserInterface
      * O retorno é um iterable para permitir processamento
      * linha a linha, sem carregar o arquivo inteiro na memória.
      *
-     * @param resource $stream
+     * @param  resource  $stream
+     * @return iterable<array<string, mixed>>
      */
     public function parse($stream): iterable;
 }

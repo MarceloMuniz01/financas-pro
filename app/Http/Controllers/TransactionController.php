@@ -62,7 +62,7 @@ class TransactionController extends Controller
                 /*
                  * Contato diretamente armazenado em transactions.contact_id.
                  */
-                'contact' => fn($query) => $query
+                'contact' => fn ($query) => $query
                     ->select([
                         'id',
                         'user_id',
@@ -79,7 +79,7 @@ class TransactionController extends Controller
                          * Caso o contato da transação seja secundário,
                          * carrega o contato principal.
                          */
-                        'mergedIntoContact' => fn($query) => $query
+                        'mergedIntoContact' => fn ($query) => $query
                             ->select([
                                 'id',
                                 'user_id',
@@ -97,7 +97,7 @@ class TransactionController extends Controller
                          * Caso a transação já pertença ao principal,
                          * carrega os contatos vinculados ao grupo.
                          */
-                        'mergedContacts' => fn($query) => $query
+                        'mergedContacts' => fn ($query) => $query
                             ->select([
                                 'id',
                                 'user_id',
@@ -168,9 +168,9 @@ class TransactionController extends Controller
                                                  */
                                                 ->orWhereHas(
                                                     'aliases',
-                                                    fn(
-                                                    Builder $aliasQuery
-                                                ) => $aliasQuery->where(
+                                                    fn (
+                                                        Builder $aliasQuery
+                                                    ) => $aliasQuery->where(
                                                         'name',
                                                         'ilike',
                                                         "%{$search}%"
@@ -197,9 +197,9 @@ class TransactionController extends Controller
                                                             )
                                                             ->orWhereHas(
                                                                 'aliases',
-                                                                fn(
-                                                                Builder $aliasQuery
-                                                            ) => $aliasQuery
+                                                                fn (
+                                                                    Builder $aliasQuery
+                                                                ) => $aliasQuery
                                                                     ->where(
                                                                         'name',
                                                                         'ilike',
@@ -229,9 +229,9 @@ class TransactionController extends Controller
                                                             )
                                                             ->orWhereHas(
                                                                 'aliases',
-                                                                fn(
-                                                                Builder $aliasQuery
-                                                            ) => $aliasQuery
+                                                                fn (
+                                                                    Builder $aliasQuery
+                                                                ) => $aliasQuery
                                                                     ->where(
                                                                         'name',
                                                                         'ilike',
@@ -257,7 +257,7 @@ class TransactionController extends Controller
 
         $query->when(
             ($filters['type'] ?? null) === 'expense',
-            fn(Builder $query) => $query->where(
+            fn (Builder $query) => $query->where(
                 'amount',
                 '<',
                 0
@@ -266,7 +266,7 @@ class TransactionController extends Controller
 
         $query->when(
             ($filters['type'] ?? null) === 'income',
-            fn(Builder $query) => $query->where(
+            fn (Builder $query) => $query->where(
                 'amount',
                 '>=',
                 0
@@ -281,10 +281,10 @@ class TransactionController extends Controller
 
         $query->when(
             $filters['category_id'] ?? null,
-            fn(
-            Builder $query,
-            int|string $categoryId
-        ) => $query->where(
+            fn (
+                Builder $query,
+                int|string $categoryId
+            ) => $query->where(
                 'category_id',
                 (int) $categoryId
             )
@@ -298,10 +298,10 @@ class TransactionController extends Controller
 
         $query->when(
             $filters['date_from'] ?? null,
-            fn(
-            Builder $query,
-            string $dateFrom
-        ) => $query->whereDate(
+            fn (
+                Builder $query,
+                string $dateFrom
+            ) => $query->whereDate(
                 'transaction_date',
                 '>=',
                 $dateFrom
@@ -310,10 +310,10 @@ class TransactionController extends Controller
 
         $query->when(
             $filters['date_to'] ?? null,
-            fn(
-            Builder $query,
-            string $dateTo
-        ) => $query->whereDate(
+            fn (
+                Builder $query,
+                string $dateTo
+            ) => $query->whereDate(
                 'transaction_date',
                 '<=',
                 $dateTo
@@ -384,8 +384,7 @@ class TransactionController extends Controller
          * A paginação é preservada.
          */
         $transactions->through(
-            fn(Transaction $transaction): array =>
-            $this->serializeTransaction($transaction)
+            fn (Transaction $transaction): array => $this->serializeTransaction($transaction)
         );
 
         /*
@@ -518,11 +517,10 @@ class TransactionController extends Controller
          */
         if (
             $validated['scope'] !== 'current'
-            && !$transaction->contact_id
+            && ! $transaction->contact_id
         ) {
             throw ValidationException::withMessages([
-                'scope' =>
-                    'Esta transação não possui um contato associado.',
+                'scope' => 'Esta transação não possui um contato associado.',
             ]);
         }
 
@@ -536,8 +534,7 @@ class TransactionController extends Controller
 
                 if ($validated['scope'] === 'current') {
                     $transaction->update([
-                        'category_id' =>
-                            $validated['category_id'],
+                        'category_id' => $validated['category_id'],
                     ]);
 
                     return;
@@ -600,7 +597,7 @@ class TransactionController extends Controller
                         )
                         ->when(
                             $transactionType === 'expense',
-                            fn(Builder $query) => $query->where(
+                            fn (Builder $query) => $query->where(
                                 'amount',
                                 '<',
                                 0
@@ -608,15 +605,14 @@ class TransactionController extends Controller
                         )
                         ->when(
                             $transactionType === 'income',
-                            fn(Builder $query) => $query->where(
+                            fn (Builder $query) => $query->where(
                                 'amount',
                                 '>=',
                                 0
                             )
                         )
                         ->update([
-                            'category_id' =>
-                                $validated['category_id'],
+                            'category_id' => $validated['category_id'],
 
                             'updated_at' => now(),
                         ]);
@@ -627,8 +623,7 @@ class TransactionController extends Controller
                     $this->updateContactDefaultCategory(
                         contact: $mainContact,
                         transactionType: $transactionType,
-                        categoryId:
-                        (int) $validated['category_id']
+                        categoryId: (int) $validated['category_id']
                     );
 
                     return;
@@ -645,15 +640,13 @@ class TransactionController extends Controller
                 */
 
                 $transaction->update([
-                    'category_id' =>
-                        $validated['category_id'],
+                    'category_id' => $validated['category_id'],
                 ]);
 
                 $this->updateContactDefaultCategory(
                     contact: $mainContact,
                     transactionType: $transactionType,
-                    categoryId:
-                    (int) $validated['category_id']
+                    categoryId: (int) $validated['category_id']
                 );
             }
         );
@@ -672,6 +665,8 @@ class TransactionController extends Controller
      *
      * O campo "original_contact" representa o contato armazenado
      * originalmente em transactions.contact_id.
+     *
+     * @return array<string, mixed>
      */
     private function serializeTransaction(
         Transaction $transaction
@@ -710,9 +705,7 @@ class TransactionController extends Controller
                 ? (int) $transaction->category_id
                 : null,
 
-            'transaction_date' =>
-                $transaction->transaction_date
-                        ?->format('Y-m-d'),
+            'transaction_date' => $transaction->transaction_date->format('Y-m-d'),
 
             'description' => $transaction->description,
 
@@ -722,20 +715,15 @@ class TransactionController extends Controller
                 ? 'expense'
                 : 'income',
 
-            'source_type' =>
-                $transaction->source_type,
+            'source_type' => $transaction->source_type,
 
-            'counterparty_name' =>
-                $transaction->counterparty_name,
+            'counterparty_name' => $effectiveContact?->name,
 
-            'counterparty_document' =>
-                $transaction->counterparty_document,
+            'counterparty_document' => $effectiveContact?->document,
 
-            'counterparty_type' =>
-                $transaction->counterparty_type,
+            'counterparty_type' => $effectiveContact?->contact_type,
 
-            'transaction_method' =>
-                $transaction->transaction_method,
+            'transaction_method' => $transaction->transaction_method,
 
             /*
              * Contato exibido normalmente pelo frontend.
@@ -758,58 +746,47 @@ class TransactionController extends Controller
                 ? [
                     'id' => (int) $originalContact->id,
                     'name' => $originalContact->name,
-                    'normalized_name' =>
-                        $originalContact->normalized_name,
-                    'document' =>
-                        $originalContact->document,
-                    'contact_type' =>
-                        $originalContact->contact_type,
-                    'merged_into_contact_id' =>
-                        (int) $effectiveContact->id,
+                    'normalized_name' => $originalContact->normalized_name,
+                    'document' => $originalContact->document,
+                    'contact_type' => $originalContact->contact_type,
+                    'merged_into_contact_id' => (int) $effectiveContact->id,
                 ]
                 : null,
 
-            'is_from_merged_contact' =>
-                $isFromMergedContact,
+            'is_from_merged_contact' => $isFromMergedContact,
 
             'category' => $transaction->category
                 ? [
-                    'id' =>
-                        (int) $transaction->category->id,
+                    'id' => (int) $transaction->category->id,
 
-                    'name' =>
-                        $transaction->category->name,
+                    'name' => $transaction->category->name,
 
-                    'type' =>
-                        $transaction->category->type,
+                    'type' => $transaction->category->type,
 
-                    'color' =>
-                        $transaction->category->color,
+                    'color' => $transaction->category->color,
                 ]
                 : null,
 
             'import' => $transaction->import
                 ? [
-                    'id' =>
-                        (int) $transaction->import->id,
+                    'id' => (int) $transaction->import->id,
 
-                    'bank' =>
-                        $transaction->import->bank,
+                    'bank' => $transaction->import->bank,
                 ]
                 : null,
 
-            'created_at' =>
-                $transaction->created_at
-                        ?->toISOString(),
+            'created_at' => $transaction->created_at
+                ?->toISOString(),
 
-            'updated_at' =>
-                $transaction->updated_at
-                        ?->toISOString(),
+            'updated_at' => $transaction->updated_at
+                ?->toISOString(),
         ];
     }
 
     /**
      * Serializa o contato efetivo da transação.
+     *
+     * @return array<string, mixed>
      */
     private function serializeEffectiveContact(
         Contact $contact,
@@ -818,27 +795,21 @@ class TransactionController extends Controller
         $linkedContacts = $contact
             ->mergedContacts
             ->map(
-                static fn(
-                Contact $linkedContact
-            ): array => [
-                    'id' =>
-                        (int) $linkedContact->id,
+                static fn (
+                    Contact $linkedContact
+                ): array => [
+                    'id' => (int) $linkedContact->id,
 
-                    'name' =>
-                        $linkedContact->name,
+                    'name' => $linkedContact->name,
 
-                    'normalized_name' =>
-                        $linkedContact->normalized_name,
+                    'normalized_name' => $linkedContact->normalized_name,
 
-                    'document' =>
-                        $linkedContact->document,
+                    'document' => $linkedContact->document,
 
-                    'contact_type' =>
-                        $linkedContact->contact_type,
+                    'contact_type' => $linkedContact->contact_type,
 
-                    'merged_at' =>
-                        $linkedContact->merged_at
-                                ?->toISOString(),
+                    'merged_at' => $linkedContact->merged_at
+                        ?->toISOString(),
                 ]
             )
             ->values();
@@ -866,19 +837,15 @@ class TransactionController extends Controller
             'user_id' => (int) $contact->user_id,
             'name' => $contact->name,
 
-            'normalized_name' =>
-                $contact->normalized_name,
+            'normalized_name' => $contact->normalized_name,
 
             'document' => $contact->document,
 
-            'contact_type' =>
-                $contact->contact_type,
+            'contact_type' => $contact->contact_type,
 
-            'linked_contacts_count' =>
-                $linkedContactsCount,
+            'linked_contacts_count' => $linkedContactsCount,
 
-            'linked_contacts' =>
-                $linkedContacts,
+            'linked_contacts' => $linkedContacts,
         ];
     }
 
@@ -890,7 +857,7 @@ class TransactionController extends Controller
         int $userId,
         bool $lockForUpdate = false
     ): Contact {
-        if (!$contact->merged_into_contact_id) {
+        if (! $contact->merged_into_contact_id) {
             return $contact;
         }
 
@@ -917,6 +884,8 @@ class TransactionController extends Controller
     /**
      * Retorna os IDs do principal e de todos os contatos
      * vinculados diretamente a ele.
+     *
+     * @return Collection<int, int>
      */
     private function getContactGroupIds(
         Contact $mainContact,
@@ -938,8 +907,7 @@ class TransactionController extends Controller
                 (int) $mainContact->id
             )
             ->map(
-                static fn($id): int =>
-                (int) $id
+                static fn ($id): int => (int) $id
             )
             ->unique()
             ->values();
@@ -956,16 +924,14 @@ class TransactionController extends Controller
     ): void {
         if ($transactionType === 'expense') {
             $contact->update([
-                'default_expense_category_id' =>
-                    $categoryId,
+                'default_expense_category_id' => $categoryId,
             ]);
 
             return;
         }
 
         $contact->update([
-            'default_income_category_id' =>
-                $categoryId,
+            'default_income_category_id' => $categoryId,
         ]);
     }
 }

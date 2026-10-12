@@ -2,15 +2,26 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int|null $default_expense_category_id
+ * @property int|null $default_income_category_id
+ * @property int|null $merged_into_contact_id
+ * @property string $name
+ * @property string $normalized_name
+ * @property string|null $document
+ * @property string|null $contact_type
+ * @property Carbon|null $merged_at
+ * @property-read int|null $transactions_count
+ */
 class Contact extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'user_id',
         'name',
@@ -37,6 +48,8 @@ class Contact extends Model
 
     /**
      * Usuário dono do contato.
+     *
+     * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
     {
@@ -47,6 +60,8 @@ class Contact extends Model
 
     /**
      * Categoria padrão para despesas.
+     *
+     * @return BelongsTo<Category, $this>
      */
     public function defaultExpenseCategory(): BelongsTo
     {
@@ -58,6 +73,8 @@ class Contact extends Model
 
     /**
      * Categoria padrão para receitas.
+     *
+     * @return BelongsTo<Category, $this>
      */
     public function defaultIncomeCategory(): BelongsTo
     {
@@ -72,6 +89,8 @@ class Contact extends Model
      *
      * Quando este campo estiver preenchido, este contato é
      * considerado um contato secundário.
+     *
+     * @return BelongsTo<Contact, $this>
      */
     public function mergedIntoContact(): BelongsTo
     {
@@ -83,6 +102,8 @@ class Contact extends Model
 
     /**
      * Contatos secundários mesclados neste contato principal.
+     *
+     * @return HasMany<Contact, $this>
      */
     public function mergedContacts(): HasMany
     {
@@ -94,6 +115,8 @@ class Contact extends Model
 
     /**
      * Apelidos associados diretamente a este contato.
+     *
+     * @return HasMany<ContactAlias, $this>
      */
     public function aliases(): HasMany
     {
@@ -107,6 +130,8 @@ class Contact extends Model
      *
      * As transações não são movidas durante a mesclagem.
      * Elas continuam vinculadas ao contato original.
+     *
+     * @return HasMany<Transaction, $this>
      */
     public function transactions(): HasMany
     {
@@ -194,14 +219,11 @@ class Contact extends Model
         string $transactionType
     ): ?int {
         return match ($transactionType) {
-            'expense' =>
-            $this->effectiveExpenseCategoryId(),
+            'expense' => $this->effectiveExpenseCategoryId(),
 
-            'income' =>
-            $this->effectiveIncomeCategoryId(),
+            'income' => $this->effectiveIncomeCategoryId(),
 
-            default =>
-            null,
+            default => null,
         };
     }
 

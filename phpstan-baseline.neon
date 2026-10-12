@@ -1,0 +1,619 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$aliases\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$contact_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$normalized_name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$transactions_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Cannot call method toISOString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int, name\: string, normalized_name\: string, document\: string\|null, contact_type\: string\|null, merged_at\: mixed, transactions_count\: int\<0, max\>\}, Closure\(App\\Models\\Contact\)\: array\{id\: int, name\: string, normalized_name\: string, document\: string\|null, contact_type\: string\|null, merged_at\: mixed, transactions_count\: int\<0, max\>\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Parameter \#1 \$collection of method Illuminate\\Pagination\\AbstractPaginator\<int,App\\Models\\Contact\>\:\:setCollection\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\Contact\>, Illuminate\\Support\\Collection\<int, array\<string, mixed\>\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Parameter \#1 \.\.\.\$values of method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:push\(\) expects array\{id\: int, user_id\: int, contact_id\: int, linked_contact_id\: null, name\: mixed, normalized_name\: mixed, source\: ''alias''\}, array\{id\: int, user_id\: int, contact_id\: int, linked_contact_id\: int, name\: mixed, normalized_name\: mixed, source\: ''linked_alias''\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Parameter \#1 \.\.\.\$values of method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:push\(\) expects array\{id\: int, user_id\: int, contact_id\: int, linked_contact_id\: null, name\: mixed, normalized_name\: mixed, source\: ''alias''\}, array\{id\: int, user_id\: int, contact_id\: int, linked_contact_id\: int, name\: mixed, normalized_name\: mixed, source\: ''linked_contact''\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 2
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:values\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/ContactController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\DashboardController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Transaction\:\:\$counterparty_document\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Transaction\:\:\$counterparty_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Transaction\:\:\$counterparty_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$bank\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$color\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$contact_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$document\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$normalized_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Cannot call method toISOString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\TransactionController\:\:getContactGroupIds\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\TransactionController\:\:serializeEffectiveContact\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\TransactionController\:\:serializeTransaction\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int, name\: string, normalized_name\: string, document\: string\|null, contact_type\: string\|null, merged_at\: mixed\}, Closure\(App\\Models\\Contact\)\: array\{id\: int, name\: string, normalized_name\: string, document\: string\|null, contact_type\: string\|null, merged_at\: mixed\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Parameter \$originalContact of method App\\Http\\Controllers\\TransactionController\:\:serializeEffectiveContact\(\) expects App\\Models\\Contact\|null, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:values\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$default_expense_category_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$default_income_category_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$normalized_name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Method App\\Jobs\\ProcessImportJob\:\:enrichPendingContact\(\) has parameter \$pendingContact with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Method App\\Jobs\\ProcessImportJob\:\:enrichPendingContact\(\) has parameter \$transaction with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Method App\\Jobs\\ProcessImportJob\:\:fallbackTransactionCode\(\) has parameter \$transaction with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Method App\\Jobs\\ProcessImportJob\:\:logStep\(\) has parameter \$extra with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Method App\\Jobs\\ProcessImportJob\:\:queueContact\(\) has parameter \$transaction with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Parameter &\$contactCache by\-ref type of method App\\Jobs\\ProcessImportJob\:\:flushContacts\(\) expects array\<string, array\<string, mixed\>\>, array\<array\<string, mixed\>\> given\.$#'
+			identifier: parameterByRef.type
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Parameter &\$pendingContacts by\-ref type of method App\\Jobs\\ProcessImportJob\:\:queueContact\(\) expects array\<string, array\<string, mixed\>\>, array\<string, array\> given\.$#'
+			identifier: parameterByRef.type
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Variable \$missingChunk in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: app/Jobs/ProcessImportJob.php
+
+		-
+			message: '#^Class App\\Models\\Category uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Category.php
+
+		-
+			message: '#^Method App\\Models\\Category\:\:contacts\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Category.php
+
+		-
+			message: '#^Method App\\Models\\Category\:\:transactions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Category.php
+
+		-
+			message: '#^Method App\\Models\\Category\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Category.php
+
+		-
+			message: '#^PHPDoc type array\<int, string\> of property App\\Models\\Category\:\:\$fillable is not covariant with PHPDoc type list\<string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$fillable\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: app/Models/Category.php
+
+		-
+			message: '#^Class App\\Models\\Contact uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:aliases\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:defaultExpenseCategory\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:defaultIncomeCategory\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:effectiveContact\(\) should return App\\Models\\Contact but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:effectiveExpenseCategory\(\) should return App\\Models\\Category\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:effectiveIncomeCategory\(\) should return App\\Models\\Category\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:mergedContacts\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:mergedIntoContact\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:transactions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Class App\\Models\\ContactAlias uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/ContactAlias.php
+
+		-
+			message: '#^Method App\\Models\\ContactAlias\:\:contact\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/ContactAlias.php
+
+		-
+			message: '#^Method App\\Models\\ContactAlias\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/ContactAlias.php
+
+		-
+			message: '#^Method App\\Models\\Import\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Import.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Transaction\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Class App\\Models\\Transaction uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:category\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:contact\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:import\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:type\(\) return type with generic class Illuminate\\Database\\Eloquent\\Casts\\Attribute does not specify its types\: TGet, TSet$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:imports\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:transactions\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Services\\BankParsers\\BankParserInterface\:\:parse\(\) return type has no value type specified in iterable type iterable\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BankParsers/BankParserInterface.php
+
+		-
+			message: '#^Argument of an invalid type list\<string\>\|false supplied for foreach, only iterables are supported\.$#'
+			identifier: foreach.nonIterable
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Comparison operation "\>\=" between int\<2, max\> and 2 is always true\.$#'
+			identifier: greaterOrEqual.alwaysTrue
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Method App\\Services\\BankParsers\\InterParser\:\:normalizeHeader\(\) has parameter \$headerRaw with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Method App\\Services\\BankParsers\\InterParser\:\:normalizeHeader\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Method App\\Services\\BankParsers\\InterParser\:\:parse\(\) return type has no value type specified in iterable type iterable\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Method App\\Services\\BankParsers\\InterParser\:\:parseDescription\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(string\|null\)\: mixed\)\|null, ''trim'' given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Parameter \#1 \$json of function json_decode expects string, string\|true given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Property App\\Services\\BankParsers\\InterParser\:\:\$cidadesValidasCache type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Property App\\Services\\BankParsers\\InterParser\:\:\$mapaPrefixosCache type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between non\-empty\-array\<string\> and false will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Services/BankParsers/InterParser.php
+
+		-
+			message: '#^Method App\\Services\\BankParsers\\NubankParser\:\:parse\(\) return type has no value type specified in iterable type iterable\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BankParsers/NubankParser.php
+
+		-
+			message: '#^Method App\\Services\\BankParsers\\NubankParser\:\:parseDescription\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BankParsers/NubankParser.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between non\-empty\-array\<string, string\|null\> and false will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Services/BankParsers/NubankParser.php
+
+		-
+			message: '#^Method App\\Services\\Categorizers\\StringMatchCategorizer\:\:matchCategory\(\) has parameter \$categories with generic class Illuminate\\Support\\Collection but does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/Categorizers/StringMatchCategorizer.php
+
+		-
+			message: '#^Method App\\Services\\Categorizers\\StringMatchCategorizer\:\:parseKeywords\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Categorizers/StringMatchCategorizer.php
+
+		-
+			message: '#^Property App\\Services\\Categorizers\\StringMatchCategorizer\:\:\$globalCategories with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/Categorizers/StringMatchCategorizer.php
+
+		-
+			message: '#^Property App\\Services\\Categorizers\\StringMatchCategorizer\:\:\$userCategories with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Services/Categorizers/StringMatchCategorizer.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Schema\\ForeignKeyDefinition\:\:index\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/migrations/2026_06_10_125619_create_contacts_table.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Schema\\ForeignKeyDefinition\:\:index\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/migrations/2026_06_10_163805_create_imports_table.php
+
+		-
+			message: '#^Call to static method make\(\) on an unknown class App\\Services\\Contacts\\ContactSimilaritySignature\.$#'
+			identifier: class.notFound
+			count: 1
+			path: database/migrations/2026_07_16_190849_add_similarity_signatures_to_contacts.php

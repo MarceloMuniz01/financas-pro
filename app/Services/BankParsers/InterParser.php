@@ -8,7 +8,10 @@ class InterParser implements BankParserInterface
 {
     protected string $arquivoCidades;
 
+    /** @var array<string, true>|null */
     protected static ?array $cidadesValidasCache = null;
+
+    /** @var array<string, list<string>>|null */
     protected static ?array $mapaPrefixosCache = null;
 
     public function __construct()
@@ -17,7 +20,8 @@ class InterParser implements BankParserInterface
     }
 
     /**
-     * @param resource $stream
+     * @param  resource  $stream
+     * @return iterable<array<string, mixed>>
      */
     public function parse($stream): iterable
     {
@@ -25,7 +29,10 @@ class InterParser implements BankParserInterface
         $header = null;
 
         while (($row = fgetcsv($stream, 0, ';')) !== false) {
-            $row = array_map('trim', $row);
+            $row = array_map(
+                static fn (?string $value): string => trim((string) $value),
+                $row
+            );
 
             if (empty(array_filter($row))) {
                 continue;
@@ -33,8 +40,9 @@ class InterParser implements BankParserInterface
 
             $lineText = implode(';', $row);
 
-            if (stripos($lineText, 'Conta ;') === 0 || stripos($row[0] ?? '', 'Conta') === 0) {
+            if (stripos($lineText, 'Conta ;') === 0 || stripos($row[0], 'Conta') === 0) {
                 $accountNumber = trim($row[1] ?? 'unknown');
+
                 continue;
             }
 
@@ -44,8 +52,9 @@ class InterParser implements BankParserInterface
             }
         }
 
-        if (!$header) {
+        if (! $header) {
             Log::error('Não foi possível localizar o cabeçalho válido no CSV do Inter.');
+
             return;
         }
 
@@ -57,7 +66,10 @@ class InterParser implements BankParserInterface
         ]);
 
         while (($rowValues = fgetcsv($stream, 0, ';')) !== false) {
-            $rowValues = array_map('trim', $rowValues);
+            $rowValues = array_map(
+                static fn (?string $value): string => trim((string) $value),
+                $rowValues
+            );
 
             if (empty(array_filter($rowValues))) {
                 continue;
@@ -83,10 +95,6 @@ class InterParser implements BankParserInterface
 
             $row = array_combine($header, $rowValues);
 
-            if ($row === false) {
-                continue;
-            }
-
             $description = trim((string) ($row['Descrição'] ?? ''));
             $rawCategory = trim((string) ($row['Categoria_Bruta'] ?? ''));
 
@@ -103,7 +111,7 @@ class InterParser implements BankParserInterface
             yield [
                 'transaction_code' => hash(
                     'sha256',
-                    $accountNumber . '|' . $rawLineForHash
+                    $accountNumber.'|'.$rawLineForHash
                 ),
 
                 'transaction_date' => $this->parseDate(
@@ -131,12 +139,20 @@ class InterParser implements BankParserInterface
         }
     }
 
+    /**
+     * @return array{
+     *     counterparty_name: string|null,
+     *     counterparty_document: string|null,
+     *     counterparty_contact_type: string|null,
+     *     transaction_method: string
+     * }
+     */
     public function parseDescription(string $description, string $historico = ''): array
     {
         $description = trim($description);
         $historico = trim($historico);
 
-        $text = trim($historico . ' ' . $description);
+        $text = trim($historico.' '.$description);
 
         $data = [
             'counterparty_name' => null,
@@ -175,6 +191,10 @@ class InterParser implements BankParserInterface
         return $data;
     }
 
+    /**
+     * @param  list<string|null>  $headerRaw
+     * @return list<string>
+     */
     private function normalizeHeader(array $headerRaw): array
     {
         return array_map(function ($column) {
@@ -218,13 +238,24 @@ class InterParser implements BankParserInterface
 
         $this->garantirListaCidadesLocal();
 
-        if (!file_exists($this->arquivoCidades)) {
+        if (! file_exists($this->arquivoCidades)) {
             self::$cidadesValidasCache = [];
             self::$mapaPrefixosCache = [];
+
             return;
         }
 
-        $linhas = file($this->arquivoCidades, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $linhas = file(
+            $this->arquivoCidades,
+            FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES
+        );
+
+        if ($linhas === false) {
+            self::$cidadesValidasCache = [];
+            self::$mapaPrefixosCache = [];
+
+            return;
+        }
 
         $cidades = [];
 
@@ -275,23 +306,21 @@ class InterParser implements BankParserInterface
         if ($qtdPalavras > 1) {
             $removeuLocalizacao = false;
 
-            if ($qtdPalavras >= 2) {
-                $duasUltimas = $palavrasTratadas[$qtdPalavras - 2] . ' ' . $palavrasTratadas[$qtdPalavras - 1];
-                $prefixoAlvo = mb_substr($duasUltimas, 0, 5);
+            $duasUltimas = $palavrasTratadas[$qtdPalavras - 2].' '.$palavrasTratadas[$qtdPalavras - 1];
+            $prefixoAlvo = mb_substr($duasUltimas, 0, 5);
 
-                if (isset(self::$mapaPrefixosCache[$prefixoAlvo])) {
-                    foreach (self::$mapaPrefixosCache[$prefixoAlvo] as $cidadeCandidata) {
-                        if (str_starts_with($cidadeCandidata, $duasUltimas)) {
-                            unset($palavrasOriginais[$qtdPalavras - 1]);
-                            unset($palavrasOriginais[$qtdPalavras - 2]);
-                            $removeuLocalizacao = true;
-                            break;
-                        }
+            if (isset(self::$mapaPrefixosCache[$prefixoAlvo])) {
+                foreach (self::$mapaPrefixosCache[$prefixoAlvo] as $cidadeCandidata) {
+                    if (str_starts_with($cidadeCandidata, $duasUltimas)) {
+                        unset($palavrasOriginais[$qtdPalavras - 1]);
+                        unset($palavrasOriginais[$qtdPalavras - 2]);
+                        $removeuLocalizacao = true;
+                        break;
                     }
                 }
             }
 
-            if (!$removeuLocalizacao) {
+            if (! $removeuLocalizacao) {
                 $ultimaPalavra = $palavrasTratadas[$qtdPalavras - 1];
 
                 if (isset(self::$cidadesValidasCache[$ultimaPalavra])) {
@@ -351,20 +380,23 @@ class InterParser implements BankParserInterface
 
             curl_close($ch);
 
-            if (!$response) {
+            if (! is_string($response) || $response === '') {
                 return;
             }
 
-            $municipios = json_decode($response, true);
+            $municipios = json_decode(
+                $response,
+                true
+            );
 
-            if (!is_array($municipios)) {
+            if (! is_array($municipios)) {
                 return;
             }
 
             $cidadesLimpas = [];
 
             foreach ($municipios as $municipio) {
-                if (!isset($municipio['nome'])) {
+                if (! isset($municipio['nome'])) {
                     continue;
                 }
 
@@ -384,7 +416,7 @@ class InterParser implements BankParserInterface
                 implode("\n", $cidadesLimpas)
             );
         } catch (\Throwable $e) {
-            Log::error('Erro ao gerar base de municípios do IBGE: ' . $e->getMessage());
+            Log::error('Erro ao gerar base de municípios do IBGE: '.$e->getMessage());
         }
     }
 
@@ -402,7 +434,7 @@ class InterParser implements BankParserInterface
         [$day, $month, $year] = $parts;
 
         if (strlen($year) === 2) {
-            $year = '20' . $year;
+            $year = '20'.$year;
         }
 
         return "{$year}-{$month}-{$day}";

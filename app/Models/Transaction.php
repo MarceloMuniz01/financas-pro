@@ -2,44 +2,44 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int|null $import_id
+ * @property int|null $contact_id
+ * @property int|null $category_id
+ * @property string|null $transaction_code
+ * @property Carbon $transaction_date
+ * @property string $description
+ * @property string $amount
+ * @property string $source_type
+ * @property string $transaction_method
+ * @property-read 'income'|'expense' $type
+ */
 class Transaction extends Model
 {
-    use HasFactory;
-
-    /**
-     * Campos permitidos para Mass Assignment.
-     */
     protected $fillable = [
         'user_id',
         'import_id',
         'contact_id',
         'category_id',
-
         'transaction_date',
         'transaction_code',
-
         'description',
         'amount',
-
         'source_type',
         'transaction_method',
     ];
 
-    /**
-     * Atributos calculados.
-     */
     protected $appends = [
         'type',
     ];
 
-    /**
-     * Casts automáticos.
-     */
     protected function casts(): array
     {
         return [
@@ -49,19 +49,19 @@ class Transaction extends Model
     }
 
     /**
-     * Tipo da transação baseado no valor.
+     * @return Attribute<'income'|'expense', never>
      */
     protected function type(): Attribute
     {
         return Attribute::make(
             get: fn () => $this->amount < 0
                 ? 'expense'
-                : 'income'
+                : 'income',
         );
     }
 
     /**
-     * Usuário dono da transação.
+     * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
     {
@@ -69,7 +69,7 @@ class Transaction extends Model
     }
 
     /**
-     * Importação que originou esta transação.
+     * @return BelongsTo<Import, $this>
      */
     public function import(): BelongsTo
     {
@@ -77,7 +77,7 @@ class Transaction extends Model
     }
 
     /**
-     * Contato (contraparte).
+     * @return BelongsTo<Contact, $this>
      */
     public function contact(): BelongsTo
     {
@@ -85,24 +85,18 @@ class Transaction extends Model
     }
 
     /**
-     * Categoria atribuída.
+     * @return BelongsTo<Category, $this>
      */
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
     }
 
-    /**
-     * Indica se é receita.
-     */
     public function isIncome(): bool
     {
         return $this->type === 'income';
     }
 
-    /**
-     * Indica se é despesa.
-     */
     public function isExpense(): bool
     {
         return $this->type === 'expense';

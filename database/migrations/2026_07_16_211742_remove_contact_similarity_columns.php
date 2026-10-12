@@ -5,7 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         /*
@@ -134,7 +135,7 @@ return new class extends Migration {
             'contacts',
             function (Blueprint $table): void {
                 if (
-                    !Schema::hasColumn(
+                    ! Schema::hasColumn(
                         'contacts',
                         'similarity_key'
                     )
@@ -150,7 +151,7 @@ return new class extends Migration {
                 }
 
                 if (
-                    !Schema::hasColumn(
+                    ! Schema::hasColumn(
                         'contacts',
                         'similarity_signature'
                     )
@@ -166,7 +167,7 @@ return new class extends Migration {
                 }
 
                 if (
-                    !Schema::hasColumn(
+                    ! Schema::hasColumn(
                         'contacts',
                         'similarity_prefix'
                     )
@@ -182,7 +183,7 @@ return new class extends Migration {
                 }
 
                 if (
-                    !Schema::hasColumn(
+                    ! Schema::hasColumn(
                         'contacts',
                         'looks_like_contact_id'
                     )
@@ -201,7 +202,7 @@ return new class extends Migration {
                 }
 
                 if (
-                    !Schema::hasColumn(
+                    ! Schema::hasColumn(
                         'contacts',
                         'similarity_dismissed_at'
                     )

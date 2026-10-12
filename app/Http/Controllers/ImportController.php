@@ -37,7 +37,7 @@ class ImportController extends Controller
 
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             abort(401);
         }
 
@@ -60,7 +60,7 @@ class ImportController extends Controller
                 "imports/{$userId}"
             );
 
-            if (!$storedPath) {
+            if (! $storedPath) {
                 return back()->with(
                     'error',
                     'Não foi possível armazenar o arquivo.'
@@ -90,30 +90,22 @@ class ImportController extends Controller
                 : 'csv';
 
             $import = Import::query()->create([
-                'user_id' =>
-                    $userId,
+                'user_id' => $userId,
 
-                'source' =>
-                    $source,
+                'source' => $source,
 
-                'bank' =>
-                    null,
+                'bank' => null,
 
-                'filename' =>
-                    $storedPath,
+                'filename' => $storedPath,
 
-                'original_filename' =>
-                    $uploadedFile
-                        ->getClientOriginalName(),
+                'original_filename' => $uploadedFile
+                    ->getClientOriginalName(),
 
-                'status' =>
-                    'pending',
+                'status' => 'pending',
 
-                'processed_at' =>
-                    null,
+                'processed_at' => null,
 
-                'error_message' =>
-                    null,
+                'error_message' => null,
             ]);
 
             /*
@@ -157,24 +149,18 @@ class ImportController extends Controller
             Log::error(
                 'Erro no upload ou processamento da importação.',
                 [
-                    'user_id' =>
-                        $userId,
+                    'user_id' => $userId,
 
-                    'import_id' =>
-                        $import?->id,
+                    'import_id' => $import?->id,
 
-                    'original_filename' =>
-                        $uploadedFile
-                            ->getClientOriginalName(),
+                    'original_filename' => $uploadedFile
+                        ->getClientOriginalName(),
 
-                    'stored_path' =>
-                        $storedPath,
+                    'stored_path' => $storedPath,
 
-                    'message' =>
-                        $exception->getMessage(),
+                    'message' => $exception->getMessage(),
 
-                    'exception' =>
-                        $exception,
+                    'exception' => $exception,
                 ]
             );
 
@@ -189,18 +175,15 @@ class ImportController extends Controller
                 && $import->status !== 'failed'
             ) {
                 $import->update([
-                    'status' =>
-                        'failed',
+                    'status' => 'failed',
 
-                    'processed_at' =>
-                        now(),
+                    'processed_at' => now(),
 
-                    'error_message' =>
-                        mb_substr(
-                            $exception->getMessage(),
-                            0,
-                            2000
-                        ),
+                    'error_message' => mb_substr(
+                        $exception->getMessage(),
+                        0,
+                        2000
+                    ),
                 ]);
             }
 
@@ -227,7 +210,7 @@ class ImportController extends Controller
     ): RedirectResponse {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             abort(401);
         }
 
@@ -259,20 +242,15 @@ class ImportController extends Controller
             Log::error(
                 'Erro ao excluir importação.',
                 [
-                    'user_id' =>
-                        $user->id,
+                    'user_id' => $user->id,
 
-                    'import_id' =>
-                        $import->id,
+                    'import_id' => $import->id,
 
-                    'filename' =>
-                        $filename,
+                    'filename' => $filename,
 
-                    'message' =>
-                        $exception->getMessage(),
+                    'message' => $exception->getMessage(),
 
-                    'exception' =>
-                        $exception,
+                    'exception' => $exception,
                 ]
             );
 

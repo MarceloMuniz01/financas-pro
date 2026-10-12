@@ -9,6 +9,7 @@ use App\Services\Contacts\ContactNameNormalizer;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -172,7 +173,7 @@ class ContactController extends Controller
             ->when(
                 ($filters['contact_type'] ?? null)
                 === 'company',
-                fn($query) => $query->where(
+                fn ($query) => $query->where(
                     'contact_type',
                     'company'
                 )
@@ -180,7 +181,7 @@ class ContactController extends Controller
             ->when(
                 ($filters['contact_type'] ?? null)
                 === 'individual',
-                fn($query) => $query->where(
+                fn ($query) => $query->where(
                     'contact_type',
                     'individual'
                 )
@@ -188,7 +189,7 @@ class ContactController extends Controller
             ->when(
                 ($filters['contact_type'] ?? null)
                 === 'unknown',
-                fn($query) => $query->whereNull(
+                fn ($query) => $query->whereNull(
                     'contact_type'
                 )
             )
@@ -196,15 +197,8 @@ class ContactController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $contacts->setCollection(
-            $contacts
-                ->getCollection()
-                ->map(
-                    fn(Contact $contact): array =>
-                    $this->serializeContactGroup(
-                        $contact
-                    )
-                )
+        $contacts->through(
+            fn (Contact $contact): array => $this->serializeContactGroup($contact)
         );
 
         $categories = Category::query()
@@ -235,12 +229,10 @@ class ContactController extends Controller
                 'categories' => $categories,
 
                 'filters' => [
-                    'search' =>
-                        $filters['search']
+                    'search' => $filters['search']
                         ?? '',
 
-                    'contact_type' =>
-                        $filters['contact_type']
+                    'contact_type' => $filters['contact_type']
                         ?? '',
                 ],
             ]
@@ -263,8 +255,7 @@ class ContactController extends Controller
 
         if ($contact->merged_into_contact_id !== null) {
             throw ValidationException::withMessages([
-                'contact' =>
-                    'Edite o contato principal deste grupo.',
+                'contact' => 'Edite o contato principal deste grupo.',
             ]);
         }
 
@@ -275,18 +266,16 @@ class ContactController extends Controller
                 )
             ),
 
-            'contact_type' =>
-                $request->input(
-                    'contact_type'
-                )
+            'contact_type' => $request->input(
+                'contact_type'
+            )
                 ?: null,
 
-            'document' =>
-                $this->normalizeDocument(
-                    $request->input(
-                        'document'
-                    )
-                ),
+            'document' => $this->normalizeDocument(
+                $request->input(
+                    'document'
+                )
+            ),
         ]);
 
         $validated = $request->validate([
@@ -396,8 +385,7 @@ class ContactController extends Controller
                     $this->validateDocument(
                         document: $value,
 
-                        contactType:
-                        $request->input(
+                        contactType: $request->input(
                             'contact_type'
                         ),
 
@@ -410,7 +398,7 @@ class ContactController extends Controller
                     'document'
                 )
                     ->where(
-                        fn($query) => $query
+                        fn ($query) => $query
                             ->where(
                                 'user_id',
                                 $userId
@@ -444,36 +432,28 @@ class ContactController extends Controller
 
         $expenseCategoryId =
             $this->validateCategory(
-                categoryId:
-                $validated[
+                categoryId: $validated[
                     'default_expense_category_id'
                 ] ?? null,
 
-                categoryType:
-                'expense',
+                categoryType: 'expense',
 
-                userId:
-                $userId,
+                userId: $userId,
 
-                field:
-                'default_expense_category_id'
+                field: 'default_expense_category_id'
             );
 
         $incomeCategoryId =
             $this->validateCategory(
-                categoryId:
-                $validated[
+                categoryId: $validated[
                     'default_income_category_id'
                 ] ?? null,
 
-                categoryType:
-                'income',
+                categoryType: 'income',
 
-                userId:
-                $userId,
+                userId: $userId,
 
-                field:
-                'default_income_category_id'
+                field: 'default_income_category_id'
             );
 
         $normalizedName =
@@ -485,25 +465,19 @@ class ContactController extends Controller
             (string) $contact->normalized_name;
 
         $contact->update([
-            'name' =>
-                $validated['name'],
+            'name' => $validated['name'],
 
-            'normalized_name' =>
-                $normalizedName,
+            'normalized_name' => $normalizedName,
 
-            'document' =>
-                $validated['document']
+            'document' => $validated['document']
                 ?? null,
 
-            'contact_type' =>
-                $validated['contact_type']
+            'contact_type' => $validated['contact_type']
                 ?? null,
 
-            'default_expense_category_id' =>
-                $expenseCategoryId,
+            'default_expense_category_id' => $expenseCategoryId,
 
-            'default_income_category_id' =>
-                $incomeCategoryId,
+            'default_income_category_id' => $incomeCategoryId,
         ]);
 
         /*
@@ -538,23 +512,17 @@ class ContactController extends Controller
                     ->newQuery()
                     ->insertOrIgnore([
                         [
-                            'user_id' =>
-                                $userId,
+                            'user_id' => $userId,
 
-                            'contact_id' =>
-                                $contact->id,
+                            'contact_id' => $contact->id,
 
-                            'name' =>
-                                $oldName,
+                            'name' => $oldName,
 
-                            'normalized_name' =>
-                                $oldNormalizedName,
+                            'normalized_name' => $oldNormalizedName,
 
-                            'created_at' =>
-                                now(),
+                            'created_at' => now(),
 
-                            'updated_at' =>
-                                now(),
+                            'updated_at' => now(),
                         ],
                     ]);
             }
@@ -592,12 +560,12 @@ class ContactController extends Controller
                     'contacts',
                     'id'
                 )->where(
-                        fn($query) => $query
-                            ->where(
-                                'user_id',
-                                $userId
-                            )
-                    ),
+                    fn ($query) => $query
+                        ->where(
+                            'user_id',
+                            $userId
+                        )
+                ),
             ],
 
             'target_contact_id' => [
@@ -608,12 +576,12 @@ class ContactController extends Controller
                     'contacts',
                     'id'
                 )->where(
-                        fn($query) => $query
-                            ->where(
-                                'user_id',
-                                $userId
-                            )
-                    ),
+                    fn ($query) => $query
+                        ->where(
+                            'user_id',
+                            $userId
+                        )
+                ),
             ],
         ]);
 
@@ -634,15 +602,14 @@ class ContactController extends Controller
             ];
 
         if (
-            !in_array(
+            ! in_array(
                 $targetContactId,
                 $contactIds,
                 true
             )
         ) {
             throw ValidationException::withMessages([
-                'target_contact_id' =>
-                    'O contato mantido deve estar entre os contatos selecionados.',
+                'target_contact_id' => 'O contato mantido deve estar entre os contatos selecionados.',
             ]);
         }
 
@@ -660,7 +627,7 @@ class ContactController extends Controller
                 === 2
                 ? 'Contatos mesclados com sucesso.'
                 : count($contactIds)
-                . ' contatos foram mesclados com sucesso.'
+                .' contatos foram mesclados com sucesso.'
             );
     }
 
@@ -682,16 +649,15 @@ class ContactController extends Controller
                     'contacts',
                     'id'
                 )->where(
-                        fn($query) =>
-                        $query
-                            ->where(
-                                'user_id',
-                                $userId
-                            )
-                            ->whereNull(
-                                'merged_into_contact_id'
-                            )
-                    ),
+                    fn ($query) => $query
+                        ->where(
+                            'user_id',
+                            $userId
+                        )
+                        ->whereNull(
+                            'merged_into_contact_id'
+                        )
+                ),
             ],
 
             'contact_ids' => [
@@ -710,12 +676,11 @@ class ContactController extends Controller
                     'contacts',
                     'id'
                 )->where(
-                        fn($query) =>
-                        $query->where(
-                            'user_id',
-                            $userId
-                        )
-                    ),
+                    fn ($query) => $query->where(
+                        'user_id',
+                        $userId
+                    )
+                ),
             ],
         ]);
 
@@ -754,8 +719,7 @@ class ContactController extends Controller
             )
             ->pluck('id')
             ->map(
-                static fn($id): int =>
-                (int) $id
+                static fn ($id): int => (int) $id
             )
             ->all();
 
@@ -764,14 +728,12 @@ class ContactController extends Controller
             !== count($contactIds)
         ) {
             throw ValidationException::withMessages([
-                'contacts' =>
-                    'Um ou mais contatos selecionados não pertencem a esse grupo.',
+                'contacts' => 'Um ou mais contatos selecionados não pertencem a esse grupo.',
             ]);
         }
 
         foreach (
-            $validContactIds
-            as $contactId
+            $validContactIds as $contactId
         ) {
             $mergeService->unmerge(
                 userId: $userId,
@@ -786,7 +748,7 @@ class ContactController extends Controller
                 count($validContactIds) === 1
                 ? 'Contato desmesclado com sucesso.'
                 : count($validContactIds)
-                . ' contatos foram desmesclados com sucesso.'
+                .' contatos foram desmesclados com sucesso.'
             );
     }
 
@@ -799,10 +761,21 @@ class ContactController extends Controller
     private function serializeContactGroup(
         Contact $contact
     ): array {
+        /**
+         * @var Collection<int, array{
+         *     id: int,
+         *     user_id: int,
+         *     contact_id: int,
+         *     linked_contact_id: int|null,
+         *     name: string,
+         *     normalized_name: string,
+         *     source: 'alias'|'linked_contact'|'linked_alias'
+         * }> $aliases
+         */
         $aliases = $contact
             ->aliases
             ->map(
-                static fn($alias): array => [
+                static fn ($alias): array => [
                     'id' => (int) $alias->id,
                     'user_id' => (int) $alias->user_id,
                     'contact_id' => (int) $alias->contact_id,
@@ -817,8 +790,7 @@ class ContactController extends Controller
             (int) $contact->transactions_count;
 
         foreach (
-            $contact->mergedContacts
-            as $linkedContact
+            $contact->mergedContacts as $linkedContact
         ) {
             $transactionsCount +=
                 (int) $linkedContact->transactions_count;
@@ -834,8 +806,7 @@ class ContactController extends Controller
             ]);
 
             foreach (
-                $linkedContact->aliases
-                as $linkedAlias
+                $linkedContact->aliases as $linkedAlias
             ) {
                 $aliases->push([
                     'id' => (int) $linkedAlias->id,
@@ -851,16 +822,14 @@ class ContactController extends Controller
 
         $aliases = $aliases
             ->reject(
-                fn(array $alias): bool =>
-                $alias['normalized_name']
-                === $contact->normalized_name
+                fn (array $alias): bool => $alias['normalized_name']
+                    === $contact->normalized_name
             )
             ->unique(
                 'normalized_name'
             )
             ->sortBy(
-                static fn(array $alias): string =>
-                mb_strtolower(
+                static fn (array $alias): string => mb_strtolower(
                     $alias['name'],
                     'UTF-8'
                 )
@@ -874,44 +843,33 @@ class ContactController extends Controller
             'normalized_name' => $contact->normalized_name,
             'document' => $contact->document,
             'contact_type' => $contact->contact_type,
-            'default_expense_category_id' =>
-                $contact->default_expense_category_id,
-            'default_income_category_id' =>
-                $contact->default_income_category_id,
-            'default_expense_category' =>
-                $contact->defaultExpenseCategory,
-            'default_income_category' =>
-                $contact->defaultIncomeCategory,
+            'default_expense_category_id' => $contact->default_expense_category_id,
+            'default_income_category_id' => $contact->default_income_category_id,
+            'default_expense_category' => $contact->defaultExpenseCategory,
+            'default_income_category' => $contact->defaultIncomeCategory,
             'aliases' => $aliases,
             'transactions_count' => $transactionsCount,
-            'linked_contacts_count' =>
-                $contact->mergedContacts->count(),
+            'linked_contacts_count' => $contact->mergedContacts->count(),
             'linked_contacts' => $contact
                 ->mergedContacts
                 ->map(
-                    static fn(Contact $linkedContact): array => [
+                    static fn (Contact $linkedContact): array => [
                         'id' => (int) $linkedContact->id,
                         'name' => $linkedContact->name,
-                        'normalized_name' =>
-                            $linkedContact->normalized_name,
+                        'normalized_name' => $linkedContact->normalized_name,
                         'document' => $linkedContact->document,
-                        'contact_type' =>
-                            $linkedContact->contact_type,
-                        'merged_at' =>
-                            $linkedContact->merged_at
-                                    ?->toISOString(),
-                        'transactions_count' =>
-                            (int) $linkedContact
-                                ->transactions_count,
+                        'contact_type' => $linkedContact->contact_type,
+                        'merged_at' => $linkedContact->merged_at
+                            ?->toISOString(),
+                        'transactions_count' => (int) $linkedContact
+                            ->transactions_count,
                     ]
                 )
                 ->values(),
-            'created_at' =>
-                $contact->created_at
-                        ?->toISOString(),
-            'updated_at' =>
-                $contact->updated_at
-                        ?->toISOString(),
+            'created_at' => $contact->created_at
+                ?->toISOString(),
+            'updated_at' => $contact->updated_at
+                ?->toISOString(),
         ];
     }
 
@@ -989,7 +947,7 @@ class ContactController extends Controller
 
         $document = (string) $document;
 
-        if (!ctype_digit($document)) {
+        if (! ctype_digit($document)) {
             $fail(
                 'Informe um CPF ou CNPJ completo.'
             );
@@ -1015,7 +973,7 @@ class ContactController extends Controller
             }
 
             if (
-                !$this->isValidCpf(
+                ! $this->isValidCpf(
                     $document
                 )
             ) {
@@ -1037,7 +995,7 @@ class ContactController extends Controller
             }
 
             if (
-                !$this->isValidCnpj(
+                ! $this->isValidCnpj(
                     $document
                 )
             ) {
@@ -1058,7 +1016,7 @@ class ContactController extends Controller
         int $userId,
         string $field
     ): ?int {
-        if (!$categoryId) {
+        if (! $categoryId) {
             return null;
         }
 
@@ -1085,10 +1043,9 @@ class ContactController extends Controller
             )
             ->first();
 
-        if (!$category) {
+        if (! $category) {
             throw ValidationException::withMessages([
-                $field =>
-                    $categoryType === 'expense'
+                $field => $categoryType === 'expense'
                     ? 'Selecione uma categoria válida de despesa.'
                     : 'Selecione uma categoria válida de receita.',
             ]);
@@ -1201,13 +1158,12 @@ class ContactController extends Controller
 
         $secondDigit =
             $this->calculateCnpjDigit(
-                base:
-                substr(
+                base: substr(
                     $cnpj,
                     0,
                     12
                 )
-                . $firstDigit,
+                .$firstDigit,
 
                 weights: [
                     6,
@@ -1233,7 +1189,7 @@ class ContactController extends Controller
     /**
      * Calcula um dígito verificador do CNPJ.
      *
-     * @param array<int> $weights
+     * @param  array<int>  $weights
      */
     private function calculateCnpjDigit(
         string $base,

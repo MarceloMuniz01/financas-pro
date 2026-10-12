@@ -6,7 +6,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         /*
@@ -53,16 +54,14 @@ return new class extends Migration {
                         DB::table('contacts')
                             ->where('id', $contact->id)
                             ->update([
-                                'normalized_name' =>
-                                    $normalizedName,
+                                'normalized_name' => $normalizedName,
 
-                                'similarity_key' =>
-                                    mb_substr(
-                                        $normalizedName,
-                                        0,
-                                        12,
-                                        'UTF-8'
-                                    ),
+                                'similarity_key' => mb_substr(
+                                    $normalizedName,
+                                    0,
+                                    12,
+                                    'UTF-8'
+                                ),
                             ]);
                     }
                 }
@@ -171,26 +170,12 @@ return new class extends Migration {
                 'transactions_user_contact_index'
             );
 
-            /*
-             * insertOrIgnore só evita duplicidade se existir uma restrição
-             * única correspondente.
-             */
-            $table->unique(
-                [
-                    'user_id',
-                    'transaction_code',
-                ],
-                'transactions_user_code_unique'
-            );
         });
     }
 
     public function down(): void
     {
         Schema::table('transactions', function (Blueprint $table) {
-            $table->dropUnique(
-                'transactions_user_code_unique'
-            );
 
             $table->dropIndex(
                 'transactions_user_contact_index'
