@@ -19,8 +19,9 @@ return new class extends Migration
              */
             $table->foreignId('user_id')
                 ->constrained()
-                ->cascadeOnDelete()
-                ->index();
+                ->cascadeOnDelete();
+
+            $table->index('user_id');
 
             /*
              * Categoria padrão para despesas.
