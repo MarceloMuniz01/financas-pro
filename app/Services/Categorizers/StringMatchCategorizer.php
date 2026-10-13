@@ -278,9 +278,19 @@ class StringMatchCategorizer
      */
     private function fallback(string $transactionType): int
     {
-        return $transactionType === 'income'
-            ? self::INCOME_FALLBACK_ID
-            : self::EXPENSE_FALLBACK_ID;
+        $categoryId = Category::query()
+            ->whereNull('user_id')
+            ->where('name', 'Outros')
+            ->where('type', $transactionType)
+            ->value('id');
+
+        if ($categoryId === null) {
+            throw new \RuntimeException(
+                "Categoria fallback 'Outros' do tipo '{$transactionType}' não encontrada."
+            );
+        }
+
+        return (int) $categoryId;
     }
 
     /**

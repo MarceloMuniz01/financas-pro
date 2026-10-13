@@ -363,7 +363,10 @@ class InterParser implements BankParserInterface
 
     private function garantirListaCidadesLocal(): void
     {
-        if (file_exists($this->arquivoCidades)) {
+        if (
+            file_exists($this->arquivoCidades)
+            || app()->environment('testing')
+        ) {
             return;
         }
 
