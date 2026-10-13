@@ -79,6 +79,8 @@ class InterParser implements BankParserInterface
                 array_pop($rowValues);
             }
 
+            // OBS: vamos atualizar isso. não se deve ignorar linha automaticamente.
+            // Deve-se: salvar a linha bruta na coluna description para o usuário poder decidir.
             if (count($header) !== count($rowValues)) {
                 if (count($header) === 5 && count($rowValues) === 4) {
                     $rowValues[] = '';
@@ -109,7 +111,8 @@ class InterParser implements BankParserInterface
             $rawLineForHash = implode('|', $rowValues);
 
             yield [
-                'transaction_code' => hash(
+                'transaction_code' => null,
+                'transaction_fingerprint' => hash(
                     'sha256',
                     $accountNumber.'|'.$rawLineForHash
                 ),

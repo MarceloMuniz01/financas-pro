@@ -308,7 +308,7 @@ test('inter csv is processed and creates transactions and contacts', function ()
      *
      * número da conta + linha normalizada.
      */
-    $transactionCode = static fn (array $row): string => hash(
+    $transactionFingerprint = static fn (array $row): string => hash(
         'sha256',
         '12345678|'.implode('|', $row)
     );
@@ -338,7 +338,8 @@ test('inter csv is processed and creates transactions and contacts', function ()
         'user_id' => $user->id,
         'import_id' => $import->id,
         'contact_id' => $market->id,
-        'transaction_code' => $transactionCode([
+        'transaction_code' => null,
+        'transaction_fingerprint' => $transactionFingerprint([
             '02/05/2026',
             'Pix enviado',
             'Pix enviado - MERCADO TESTE LTDA',
@@ -377,7 +378,8 @@ test('inter csv is processed and creates transactions and contacts', function ()
         'user_id' => $user->id,
         'import_id' => $import->id,
         'contact_id' => $customer->id,
-        'transaction_code' => $transactionCode([
+        'transaction_code' => null,
+        'transaction_fingerprint' => $transactionFingerprint([
             '03/05/2026',
             'Pix recebido',
             'Pix recebido - CLIENTE EXEMPLO',
@@ -416,7 +418,8 @@ test('inter csv is processed and creates transactions and contacts', function ()
         'user_id' => $user->id,
         'import_id' => $import->id,
         'contact_id' => $store->id,
-        'transaction_code' => $transactionCode([
+        'transaction_code' => null,
+        'transaction_fingerprint' => $transactionFingerprint([
             '04/05/2026',
             'Compra no débito',
             'Compra no debito - LOJA FICTICIA LTDA',
@@ -455,7 +458,8 @@ test('inter csv is processed and creates transactions and contacts', function ()
         'user_id' => $user->id,
         'import_id' => $import->id,
         'contact_id' => $service->id,
-        'transaction_code' => $transactionCode([
+        'transaction_code' => null,
+        'transaction_fingerprint' => $transactionFingerprint([
             '05/05/2026',
             'Boleto',
             'SERVICO DEMONSTRACAO LTDA',
@@ -591,6 +595,12 @@ test('unknown bank csv fails import', function () {
     );
 });
 
+/*
+ * Only sources with a reliable transaction_code can be
+ * deterministically deduplicated during import.
+ *
+ * Nubank provides a reliable Identificador field.
+ */
 test('reimporting the same csv does not duplicate transactions or contacts', function (string $fixture, string $bank) {
     config()->set('filesystems.default', 'local');
 
@@ -697,10 +707,5 @@ test('reimporting the same csv does not duplicate transactions or contacts', fun
     'nubank' => [
         'nubank.csv',
         'nubank',
-    ],
-
-    'inter' => [
-        'inter.csv',
-        'inter',
     ],
 ]);

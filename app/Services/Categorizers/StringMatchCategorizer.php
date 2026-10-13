@@ -7,10 +7,6 @@ use Illuminate\Support\Collection;
 
 class StringMatchCategorizer
 {
-    private const EXPENSE_FALLBACK_ID = 1;
-
-    private const INCOME_FALLBACK_ID = 8;
-
     /**
      * Keywords curtas usam correspondência por palavra completa
      * para evitar falsos positivos.

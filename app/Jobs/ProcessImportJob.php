@@ -1047,13 +1047,8 @@ class ProcessImportJob
 
             'category_id' => $categoryId,
 
-            'transaction_code' => $transaction[
-                'transaction_code'
-            ]
-                ?? $this
-                    ->fallbackTransactionCode(
-                        $transaction
-                    ),
+            'transaction_code' => $transaction['transaction_code'] ?? null,
+            'transaction_fingerprint' => $transaction['transaction_fingerprint'] ?? null,
 
             'transaction_date' => $transaction[
                 'transaction_date'
@@ -1180,32 +1175,6 @@ class ProcessImportJob
      *
      * @param  array<string, mixed>  $transaction
      */
-    private function fallbackTransactionCode(
-        array $transaction
-    ): string {
-        return hash(
-            'sha256',
-            implode('|', [
-                $this->import->user_id,
-
-                $transaction[
-                    'transaction_date'
-                ] ?? '',
-
-                $transaction[
-                    'description'
-                ] ?? '',
-
-                $transaction[
-                    'amount'
-                ] ?? '',
-
-                $transaction[
-                    'source_type'
-                ] ?? 'manual_import',
-            ])
-        );
-    }
 
     /**
      * Registra duração e memória de uma etapa.
